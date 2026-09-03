@@ -13,7 +13,8 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 - Adet girildiğinde tabla bazlı parti hesabı: parçalar tablaya ızgara yerleşimiyle sığdırılır, reçinede süre parça sayısından bağımsız (katman sayısı), FDM'de ısınma/kalibrasyon ve renk değişimleri tabla başına amortize edilir
 - Üç yazıcının aynı model için yan yana karşılaştırması (adet başına ve toplam sipariş fiyatı)
 - Kendi yazıcınızı ve malzemenizi ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcı/malzemeler yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
-- Tüm fiyat/parametreler tarayıcıda (localStorage) saklanır; yazdır / PDF çıktısı
+- Müşteriye gönderilebilir **teklif PDF'i**: firma bilgisi ve logo (PNG/JPEG/SVG, tarayıcıda saklanır), 3B görünümden model görseli, kalemsiz fiyat tablosu (kâr marjı ya da elle girilen birim/toplam fiyat), KDV, isteğe bağlı üretim bilgisi; Türkçe karakterler için gömülü DejaVu Sans
+- Tüm fiyat/parametreler tarayıcıda (localStorage) saklanır; yazdır çıktısı
 
 ## Geliştirme
 

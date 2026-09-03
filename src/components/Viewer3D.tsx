@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { effectiveScale, type Placement, type Vec3 } from '../lib/mesh/types.ts'
@@ -16,6 +16,8 @@ interface Props {
   /** Gösterilecek kopya sayısı ve tabla yerleşimi (adet > 1) */
   copies: number
   layout: PlateLayout | null
+  /** Açık zeminli PNG yakalama fonksiyonu buraya yazılır */
+  captureRef?: MutableRefObject<(() => string | null) | null>
 }
 
 const COLOR_NORMAL = new THREE.Color('#60a5fa')
@@ -23,7 +25,7 @@ const COLOR_OVERHANG = new THREE.Color('#f97316')
 const COLOR_BED = new THREE.Color('#22c55e')
 const MAX_INSTANCES = 400
 
-export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax, bed, fits, copies, layout }: Props) {
+export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax, bed, fits, copies, layout, captureRef }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -34,6 +36,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     bedGroup: THREE.Group
     modelGroup: THREE.Group
     mesh: THREE.InstancedMesh | null
+    plate: THREE.Mesh | null
   } | null>(null)
 
   // Sahne kurulumu
@@ -67,7 +70,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     const modelGroup = new THREE.Group()
     root.add(bedGroup, modelGroup)
 
-    sceneRef.current = { renderer, scene, camera, controls, root, bedGroup, modelGroup, mesh: null }
+    sceneRef.current = { renderer, scene, camera, controls, root, bedGroup, modelGroup, mesh: null, plate: null }
 
     let raf = 0
     const loop = () => {
@@ -118,6 +121,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     vol.position.set(x / 2, y / 2, z / 2)
     const axes = new THREE.AxesHelper(Math.min(x, y) * 0.25)
     s.bedGroup.add(plate, grid, vol, axes)
+    s.plate = plate
 
     // Kamerayı tablaya göre konumla
     const d = Math.max(x, y, z) * 1.8
@@ -213,6 +217,26 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     s.controls.target.set(bed.x / 2, h / 2, -bed.y / 2)
     s.camera.position.set(bed.x / 2 + d * 0.6, h / 2 + d * 0.45, -bed.y / 2 + d * 0.6)
   }, [placement, bboxMin, bboxMax, bed.x, bed.y, positions, copies, layout])
+
+  // Teklif PDF'i için açık zeminli görüntü yakalama
+  useEffect(() => {
+    if (!captureRef) return
+    captureRef.current = () => {
+      const s = sceneRef.current
+      if (!s || !s.mesh) return null
+      const plateMat = s.plate?.material as THREE.MeshBasicMaterial | undefined
+      const oldPlate = plateMat?.color.clone()
+      const oldOpacity = plateMat?.opacity
+      s.scene.background = new THREE.Color('#ffffff')
+      if (plateMat) { plateMat.color.set('#e2e8f0'); plateMat.opacity = 1 }
+      s.renderer.render(s.scene, s.camera)
+      const url = s.renderer.domElement.toDataURL('image/png')
+      s.scene.background = null
+      if (plateMat && oldPlate) { plateMat.color.copy(oldPlate); plateMat.opacity = oldOpacity ?? 0.9 }
+      return url
+    }
+    return () => { captureRef.current = null }
+  }, [captureRef])
 
   return <div ref={mountRef} className="h-full w-full" />
 }

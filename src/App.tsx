@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRINTERS } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
@@ -17,7 +17,9 @@ import { SettingsDialog, type PrinterOverride } from './components/SettingsDialo
 import { PrinterEditor } from './components/PrinterEditor.tsx'
 import { MaterialEditor } from './components/MaterialEditor.tsx'
 import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
-import { downloadQuotePdf } from './lib/pdf/quote.ts'
+import { downloadQuotePdf, type QuoteImage, type QuotePricing } from './lib/pdf/quote.ts'
+import { imageSize } from './lib/pdf/image.ts'
+import { QuoteDialog } from './components/QuoteDialog.tsx'
 
 const LS = 'fdm-sla-calc:v1:'
 
@@ -43,6 +45,10 @@ export default function App() {
   const [customer, setCustomer] = useState('')
   const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  const [modelImage, setModelImage] = useState<QuoteImage | null>(null)
+  const [logo, setLogo] = useLocalStorage<QuoteImage | null>(LS + 'quoteLogo', null)
+  const captureRef = useRef<(() => string | null) | null>(null)
   const mesh = useMeshWorker()
 
   // Etkin yazıcı / malzeme (override'lar uygulanmış)
@@ -220,6 +226,7 @@ export default function App() {
               fits={fits}
               copies={qty}
               layout={layout}
+              captureRef={captureRef}
             />
             <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-400">
               {printer.brand} {printer.name} · tabla {printer.bed.x}×{printer.bed.y}×{printer.bed.z} mm
@@ -283,25 +290,16 @@ export default function App() {
           <Card title="Fiyat tahmini" right={estimate && (
             <div className="flex gap-1">
               <Button variant="ghost" onClick={() => window.print()}>🖨 Yazdır</Button>
-              <Button variant="primary" disabled={pdfBusy} onClick={async () => {
-                if (!estimate || !stats || !material || !mesh.model) return
-                setPdfBusy(true); setPdfError(null)
-                try {
-                  await downloadQuotePdf({ est: estimate, stats, printer, material, settings, fdmParams, resinParams, placement, fileName: mesh.model.fileName, triangleCount: mesh.model.triangleCount, customer })
-                } catch (e) {
-                  setPdfError(e instanceof Error ? e.message : String(e))
-                } finally { setPdfBusy(false) }
-              }}>{pdfBusy ? 'Hazırlanıyor…' : '⬇ PDF indir'}</Button>
+              <Button variant="primary" onClick={async () => {
+                setPdfError(null)
+                const url = captureRef.current?.()
+                if (url) { try { const { w, h } = await imageSize(url); setModelImage({ dataUrl: url, w, h }) } catch { setModelImage(null) } } else setModelImage(null)
+                setQuoteOpen(true)
+              }}>📄 Teklif PDF'i</Button>
             </div>
           )}>
             {estimate && material ? (
-              <>
-                <div className="mb-3 flex items-center gap-2">
-                  <input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Müşteri adı (teklif PDF'i için, isteğe bağlı)" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" />
-                </div>
-                {pdfError && <div className="mb-3 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-xs text-red-200">PDF oluşturulamadı: {pdfError}</div>}
-                <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} />
-              </>
+              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} />
             ) : (
               <div className="text-sm text-zinc-500">
                 {mesh.error ? (
@@ -332,6 +330,25 @@ export default function App() {
         Tüm hesaplamalar tarayıcınızda yapılır; dosyalar sunucuya gönderilmez. Fiyat verileri Eylül 2026 Türkiye perakende referanslıdır.
       </footer>
 
+      {estimate && material && quoteOpen && (
+        <QuoteDialog
+          open={quoteOpen} est={estimate} settings={settings}
+          customer={customer} onCustomer={setCustomer}
+          logo={logo} onLogo={setLogo} modelImage={modelImage}
+          busy={pdfBusy} error={pdfError}
+          onClose={() => setQuoteOpen(false)}
+          onGenerate={async (pricing: QuotePricing, includeProduction: boolean) => {
+            if (!stats || !mesh.model) return
+            setPdfBusy(true); setPdfError(null)
+            try {
+              await downloadQuotePdf({ est: estimate, stats, printer, material, settings, fdmParams, resinParams, placement, fileName: mesh.model.fileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction })
+              setQuoteOpen(false)
+            } catch (e) {
+              setPdfError(e instanceof Error ? e.message : String(e))
+            } finally { setPdfBusy(false) }
+          }}
+        />
+      )}
       <PrinterEditor
         key={editor.open ? (editor.printer?.id ?? 'new') : 'closed'}
         open={editor.open} initial={editor.printer} templates={printers}
