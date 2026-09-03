@@ -209,7 +209,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
 
     // Kamerayı sahneye odakla (tek parça: modele; çoklu: tablaya)
     const focus = shown > 1 ? Math.max(bed.x, bed.y, h) : Math.max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y, h)
-    const d = Math.max(focus * (shown > 1 ? 1.6 : 3.2), 120)
+    const d = Math.max(focus * (shown > 1 ? 2.4 : 3.2), 120)
     s.controls.target.set(bed.x / 2, h / 2, -bed.y / 2)
     s.camera.position.set(bed.x / 2 + d * 0.6, h / 2 + d * 0.45, -bed.y / 2 + d * 0.6)
   }, [placement, bboxMin, bboxMax, bed.x, bed.y, positions, copies, layout])
