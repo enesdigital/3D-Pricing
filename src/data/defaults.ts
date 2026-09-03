@@ -31,20 +31,21 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   currency: 'TRY',
   electricityTRYPerKWh: 3.25, // EPDK Nis-2026: mesken kademe 1 ≈ 3.2; kademe 2 ≈ 4.7–5.9; ticarethane ≈ 6.5 ₺/kWh
   laborTRYPerHour: 200,
-  fdmSetupMinutes: 15,
-  resinSetupMinutes: 10,
-  resinPostMinutes: 20,
+  fdmSetupMinutes: 12,     // tabla başına: dilimleme, yükleme, çıkarma
+  resinSetupMinutes: 5,    // tabla başına: reçine, plaka, sıyırma
+  resinPostMinutes: 10,    // tabla/parti başına: yıkama + kürleme işlemi
   ipaTRYPerLiter: 250,
-  ipaLitersPerPrintBase: 0.05,
-  failureRate: 0.05,
+  ipaLitersPerPrintBase: 0.025, // parça başına ~20–30 ml (1 L ≈ 30–50 küçük baskı)
+  failureRate: 0.08,       // FDM prosumer %8–10
+  resinFailureRate: 0.12,  // reçine %10–20
   markup: 0.5,
   timeMultiplier: 1.0,
-  fdmPartSpacingMm: 6,
-  resinPartSpacingMm: 5,
-  plateMarginMm: 4,
-  fdmPerPartMinutes: 1.5,
-  resinPerPartMinutes: 4,
-  resinLiftAreaPenalty: 0.25,
+  fdmPartSpacingMm: 3,     // Bambu Studio auto-arrange varsayılanı 2 mm + skirt payı
+  resinPartSpacingMm: 5,   // küçük parçalar; büyük taban alanlı parçalarda otomatik 15 mm
+  plateMarginMm: 3,
+  fdmPerPartMinutes: 1.5,  // tabladan alma + temizlik
+  resinPerPartMinutes: 5,  // destek sökme 2–15 dk (tipik 4–8)
+  resinLiftAreaPenalty: 0.15, // T_plate × (1 + 0.15 × kaplama), üst sınır +%30; tilt-release makinelerde 0
   vat: 0.2,
   minimumPriceTRY: 150,
   packagingTRY: 0,

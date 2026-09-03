@@ -46,6 +46,8 @@ export interface ResinPrinterSpec {
   avgPowerW: number
   /** Yıkama+kürleme istasyonu gücü, W (varsa) */
   postPowerW: number
+  /** Tilt-release (eğimli ayırma) mekanizması: kaplama arttıkça kaldırma cezası uygulanmaz */
+  tiltRelease: boolean
 }
 
 export interface PrinterProfile {
@@ -125,9 +127,12 @@ export interface BusinessSettings {
   resinPostMinutes: number
   /** Yıkama sarfı (IPA) TRY / baskı (hacme göre ölçeklenir) */
   ipaTRYPerLiter: number
+  /** IPA tüketimi, parça başına L (yüzey alanına göre artar) */
   ipaLitersPerPrintBase: number
-  /** Başarısız baskı oranı 0..1 (malzeme+süre kaybı) */
+  /** Başarısız baskı oranı 0..1 — FDM */
   failureRate: number
+  /** Başarısız baskı oranı 0..1 — reçine */
+  resinFailureRate: number
   /** Kâr marjı 0..1 (maliyet üstüne) */
   markup: number
   /** KDV 0..1 (fiyat üstüne ayrı gösterilir) */
@@ -147,7 +152,7 @@ export interface BusinessSettings {
   fdmPerPartMinutes: number
   /** Parça başına destek sökme/temizlik dk — reçine */
   resinPerPartMinutes: number
-  /** Reçine: tabla kaplama oranı 1.0 iken kaldırma döngüsüne eklenen oran (ayrılma kuvveti) */
+  /** Reçine: tabla kaplama oranı 1.0 iken katman süresine eklenen oran (ayrılma kuvveti için rest/lift yavaşlatma), üst sınır +%30 */
   resinLiftAreaPenalty: number
 }
 

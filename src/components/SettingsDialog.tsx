@@ -47,20 +47,21 @@ export function SettingsDialog(p: Props) {
               <Field label="İşçilik ücreti"><NumberInput value={s.laborTRYPerHour} onChange={(v) => set('laborTRYPerHour', v)} min={0} step={10} suffix="₺/sa" /></Field>
               <Field label="Kâr marjı"><NumberInput value={Math.round(s.markup * 100)} onChange={(v) => set('markup', v / 100)} min={0} max={500} step={5} suffix="%" /></Field>
               <Field label="KDV"><NumberInput value={Math.round(s.vat * 100)} onChange={(v) => set('vat', v / 100)} min={0} max={50} step={1} suffix="%" /></Field>
-              <Field label="Başarısız baskı oranı"><NumberInput value={Math.round(s.failureRate * 100)} onChange={(v) => set('failureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
+              <Field label="Başarısız baskı oranı (FDM)" hint="Print farm %2–5, prosumer %8–10"><NumberInput value={Math.round(s.failureRate * 100)} onChange={(v) => set('failureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
+              <Field label="Başarısız baskı oranı (reçine)" hint="Tipik %10–20"><NumberInput value={Math.round(s.resinFailureRate * 100)} onChange={(v) => set('resinFailureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
               <Field label="Minimum sipariş"><NumberInput value={s.minimumPriceTRY} onChange={(v) => set('minimumPriceTRY', v)} min={0} step={10} suffix="₺" /></Field>
               <Field label="Ambalaj (adet)"><NumberInput value={s.packagingTRY} onChange={(v) => set('packagingTRY', v)} min={0} step={5} suffix="₺" /></Field>
               <Field label="FDM hazırlık işçiliği" hint="Tabla başına"><NumberInput value={s.fdmSetupMinutes} onChange={(v) => set('fdmSetupMinutes', v)} min={0} step={1} suffix="dk" /></Field>
               <Field label="Reçine hazırlık" hint="Tabla başına"><NumberInput value={s.resinSetupMinutes} onChange={(v) => set('resinSetupMinutes', v)} min={0} step={1} suffix="dk" /></Field>
-              <Field label="Reçine yıkama/kürleme" hint="Tabla başına"><NumberInput value={s.resinPostMinutes} onChange={(v) => set('resinPostMinutes', v)} min={0} step={1} suffix="dk" /></Field>
+              <Field label="Reçine yıkama/kürleme" hint="Tabla/parti başına (toplu işlem)"><NumberInput value={s.resinPostMinutes} onChange={(v) => set('resinPostMinutes', v)} min={0} step={1} suffix="dk" /></Field>
               <Field label="IPA fiyatı"><NumberInput value={s.ipaTRYPerLiter} onChange={(v) => set('ipaTRYPerLiter', v)} min={0} step={10} suffix="₺/L" /></Field>
-              <Field label="IPA tüketimi (taban)" hint="Yüzey alanına göre artar"><NumberInput value={Math.round(s.ipaLitersPerPrintBase * 1000)} onChange={(v) => set('ipaLitersPerPrintBase', v / 1000)} min={0} step={10} suffix="ml/baskı" /></Field>
+              <Field label="IPA tüketimi (parça başına)" hint="Yüzey alanına göre artar; 1 L ≈ 30–50 küçük parça"><NumberInput value={Math.round(s.ipaLitersPerPrintBase * 1000)} onChange={(v) => set('ipaLitersPerPrintBase', v / 1000)} min={0} step={5} suffix="ml" /></Field>
               <Field label="FDM parça başına işçilik" hint="Tabladan alma, temizlik"><NumberInput value={s.fdmPerPartMinutes} onChange={(v) => set('fdmPerPartMinutes', v)} min={0} step={0.5} suffix="dk" /></Field>
               <Field label="Reçine parça başına işçilik" hint="Destek sökme, kontrol"><NumberInput value={s.resinPerPartMinutes} onChange={(v) => set('resinPerPartMinutes', v)} min={0} step={0.5} suffix="dk" /></Field>
-              <Field label="FDM parça aralığı" hint="Tabla yerleşimi (Bambu Studio arrange)"><NumberInput value={s.fdmPartSpacingMm} onChange={(v) => set('fdmPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
-              <Field label="Reçine parça aralığı"><NumberInput value={s.resinPartSpacingMm} onChange={(v) => set('resinPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
+              <Field label="FDM parça aralığı" hint="Bambu Studio auto-arrange varsayılanı 2 mm"><NumberInput value={s.fdmPartSpacingMm} onChange={(v) => set('fdmPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
+              <Field label="Reçine parça aralığı" hint="Küçük parçalar; >40 cm² tabanlarda otomatik 15 mm"><NumberInput value={s.resinPartSpacingMm} onChange={(v) => set('resinPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
               <Field label="Tabla kenar payı"><NumberInput value={s.plateMarginMm} onChange={(v) => set('plateMarginMm', v)} min={0} step={1} suffix="mm" /></Field>
-              <Field label="Reçine kaplama cezası" hint="Tabla tamamen doluyken kaldırma döngüsü uzaması"><NumberInput value={Math.round(s.resinLiftAreaPenalty * 100)} onChange={(v) => set('resinLiftAreaPenalty', v / 100)} min={0} max={200} step={5} suffix="%" /></Field>
+              <Field label="Reçine kaplama cezası" hint="Statik ayırmalı makinelerde tabla doluyken katman süresi artışı (üst sınır %30); tilt-release yazıcılarda uygulanmaz"><NumberInput value={Math.round(s.resinLiftAreaPenalty * 100)} onChange={(v) => set('resinLiftAreaPenalty', v / 100)} min={0} max={200} step={5} suffix="%" /></Field>
               <Field label="Süre kalibrasyonu" hint="Dilimleyici sonucunuza göre çarpan (Bambu Studio gerçekte %15–20 kısa tahmin eder)"><NumberInput value={s.timeMultiplier} onChange={(v) => set('timeMultiplier', v)} min={0.3} max={3} step={0.05} suffix="×" /></Field>
             </div>
           </section>

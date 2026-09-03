@@ -14,6 +14,7 @@ import { ModelPanel } from './components/ModelPanel.tsx'
 import { FdmParamsPanel, ResinParamsPanel } from './components/ParamsPanel.tsx'
 import { ResultsPanel } from './components/ResultsPanel.tsx'
 import { SettingsDialog, type PrinterOverride } from './components/SettingsDialog.tsx'
+import { PrinterEditor } from './components/PrinterEditor.tsx'
 import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
 
 const LS = 'fdm-sla-calc:v1:'
@@ -28,18 +29,35 @@ export default function App() {
   const [printerId, setPrinterId] = useLocalStorage<string>(LS + 'printerId', PRINTERS[0].id)
   const [materialId, setMaterialId] = useLocalStorage<string>(LS + 'materialId', MATERIALS[0].id)
   const [manifoldCheck, setManifoldCheck] = useLocalStorage<boolean>(LS + 'manifoldCheck', true)
+  // Kullanıcının eklediği yazıcılar: yalnızca bu tarayıcıda (localStorage) saklanır
+  const [customPrinters, setCustomPrinters] = useLocalStorage<PrinterProfile[]>(LS + 'customPrinters', [], (st, init) => (Array.isArray(st) ? (st as PrinterProfile[]) : init))
 
   // --- Oturum durumu ---
   const [placement, setPlacement] = useState<Placement>(DEFAULT_PLACEMENT)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [editor, setEditor] = useState<{ open: boolean; printer: PrinterProfile | null }>({ open: false, printer: null })
   const mesh = useMeshWorker()
 
   // Etkin yazıcı / malzeme (override'lar uygulanmış)
-  const printers = useMemo<PrinterProfile[]>(() => PRINTERS.map((p) => {
-    const o = printerOverrides[p.id]
-    if (!o) return p
-    return { ...p, priceTRY: o.priceTRY ?? p.priceTRY, lifetimeHours: o.lifetimeHours ?? p.lifetimeHours, maintenanceTRYPerHour: o.maintenanceTRYPerHour ?? p.maintenanceTRYPerHour, spec: { ...p.spec, avgPowerW: o.avgPowerW ?? p.spec.avgPowerW } }
-  }), [printerOverrides])
+  const printers = useMemo<PrinterProfile[]>(() => [
+    ...PRINTERS.map((p) => {
+      const o = printerOverrides[p.id]
+      if (!o) return p
+      return { ...p, priceTRY: o.priceTRY ?? p.priceTRY, lifetimeHours: o.lifetimeHours ?? p.lifetimeHours, maintenanceTRYPerHour: o.maintenanceTRYPerHour ?? p.maintenanceTRYPerHour, spec: { ...p.spec, avgPowerW: o.avgPowerW ?? p.spec.avgPowerW } }
+    }),
+    ...customPrinters,
+  ], [printerOverrides, customPrinters])
+  const isCustom = (id: string) => customPrinters.some((p) => p.id === id)
+  const savePrinter = (p: PrinterProfile) => {
+    setCustomPrinters((list) => (list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p]))
+    setPrinterId(p.id)
+    setEditor({ open: false, printer: null })
+  }
+  const deletePrinter = (id: string) => {
+    setCustomPrinters((list) => list.filter((x) => x.id !== id))
+    if (printerId === id) setPrinterId(PRINTERS[0].id)
+    setEditor({ open: false, printer: null })
+  }
   const materials = useMemo(() => MATERIALS.map((m) => ({ ...m, pricePerKgTRY: materialPrices[m.id] ?? m.pricePerKgTRY })), [materialPrices])
   const printer = printers.find((p) => p.id === printerId) ?? printers[0]
   const techMaterials = materials.filter((m) => m.tech === printer.tech)
@@ -138,8 +156,12 @@ export default function App() {
           <Card title="Yazıcı ve malzeme">
             <div className="space-y-3">
               <Field label="Yazıcı">
-                <Select value={printer.id} onChange={setPrinterId} options={printers.map((p) => ({ value: p.id, label: `${p.brand} ${p.name} · ${p.tech === 'fdm' ? 'FDM' : 'Reçine'} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` }))} />
+                <Select value={printer.id} onChange={setPrinterId} options={printers.map((p) => ({ value: p.id, label: `${isCustom(p.id) ? '★ ' : ''}${p.brand} ${p.name} · ${p.tech === 'fdm' ? 'FDM' : 'Reçine'} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` }))} />
               </Field>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setEditor({ open: true, printer: null })}>+ Yazıcı ekle</Button>
+                {isCustom(printer.id) && <Button variant="ghost" onClick={() => setEditor({ open: true, printer })}>Düzenle / Sil</Button>}
+              </div>
               {printer.notes && <p className="text-[11px] leading-snug text-zinc-500">{printer.notes}</p>}
               <Field label="Malzeme">
                 <Select value={material?.id ?? ''} onChange={setMaterialId} options={techMaterials.map((m) => ({ value: m.id, label: `${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg` }))} />
@@ -248,6 +270,11 @@ export default function App() {
         Tüm hesaplamalar tarayıcınızda yapılır; dosyalar sunucuya gönderilmez. Fiyat verileri Eylül 2026 Türkiye perakende referanslıdır.
       </footer>
 
+      <PrinterEditor
+        key={editor.open ? (editor.printer?.id ?? 'new') : 'closed'}
+        open={editor.open} initial={editor.printer} templates={printers}
+        onSave={savePrinter} onDelete={deletePrinter} onClose={() => setEditor({ open: false, printer: null })}
+      />
       <SettingsDialog
         open={settingsOpen} onClose={() => setSettingsOpen(false)}
         settings={settings} onSettings={setSettings}

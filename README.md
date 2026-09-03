@@ -10,7 +10,9 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 - FDM modeli: duvar + üst/alt kabuk + dolgu + destek + purge/flush israfı; katman bazlı süre (malzeme/makine akış tavanı, min. katman süresi, ısınma/kalibrasyon, AMS renk değişimi)
 - Reçine modeli: hacim + destek + boşaltma; katman × (pozlama + kaldırma döngüsü); IPA, FEP/LCD sarfı
 - Maliyet: malzeme, elektrik, amortisman, bakım, işçilik, başarısızlık riski, kâr marjı, KDV, minimum sipariş, adet
-- Üç yazıcının aynı model için yan yana karşılaştırması
+- Adet girildiğinde tabla bazlı parti hesabı: parçalar tablaya ızgara yerleşimiyle sığdırılır, reçinede süre parça sayısından bağımsız (katman sayısı), FDM'de ısınma/kalibrasyon ve renk değişimleri tabla başına amortize edilir
+- Üç yazıcının aynı model için yan yana karşılaştırması (adet başına ve toplam sipariş fiyatı)
+- Kendi yazıcınızı ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcılar yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
 - Tüm fiyat/parametreler tarayıcıda (localStorage) saklanır; yazdır / PDF çıktısı
 
 ## Geliştirme
@@ -48,7 +50,9 @@ npm run dev
 | FDM süre | Katman başına hacim ÷ efektif akış; efektif akış = min(malzeme, makine) maks. akış × k(S/V) × makine verimi; min. katman süresi tabanı; katman geçişi; ısınma/kalibrasyon; renk değişimleri |
 | Reçine malzeme | Hacim (boşaltma: kabuk + kalan) + destek oranı + %8 yıkama kaybı; yoğunluk ~1.10 |
 | Reçine süre | taban katman × (taban pozlama + döngü) + kalan × (pozlama + döngü) |
-| Maliyet | malzeme + elektrik + fiyat/ömür × saat + bakım × saat + işçilik → × başarısızlık → × (1 + kâr) → min. sipariş → KDV |
+| Parti (adet) | parça/tabla = ⌊(tabla+aralık)/(parça+aralık)⌋ her iki eksende (90° denenir); tabla sayısı = ⌈adet/parça⌉. FDM: tabla süresi = iş başlangıcı + Σ katman max(k×t, min. katman süresi) + travel (+%2–5, ≥10 parça) + renk değişimleri (tabla başına bir kez). Reçine: tabla süresi katman sayısına bağlı; statik ayırmalı makinelerde ×(1 + 0.15×kaplama) en fazla +%30, tilt-release'te ceza yok |
+| İşçilik | tabla başına hazırlık (FDM 12 dk, reçine 5 dk + 10 dk yıkama/kürleme partisi) + parça başına (FDM 1.5 dk, reçine 5 dk destek sökme) |
+| Maliyet | malzeme + elektrik + fiyat/ömür × saat + bakım × saat + işçilik → × başarısızlık (FDM %8, reçine %12) → × (1 + kâr) → min. sipariş → KDV |
 
 Varsayılan değerlerin kaynakları: Bambu Lab resmi spec PDF'leri ve Bambu Wiki güç ölçümleri, BambuStudio filament/süreç profilleri (yoğunluk, maks. akış, min. katman süresi, flush hacimleri), Elegoo ürün sayfaları ve Jupiter SE resmi reçine ayarları, Tom's Hardware / CNC Kitchen incelemeleri, EPDK Nisan 2026 elektrik tarifeleri, Türkiye perakende fiyatları (Akakçe, Robolink, Metatech, Robot Sepeti). Tümü `src/data/` altında yorumlarla belirtilmiştir ve Ayarlar'dan değiştirilebilir.
 

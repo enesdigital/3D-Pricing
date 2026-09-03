@@ -118,9 +118,9 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
       // Aynı katmanda k parça: soğutma tabanı katman toplamına uygulanır (küçük parçalar partide daha verimli)
       extrude += Math.max(layerExtrude[i] * k, minLayer)
     }
-    // Parçalar arası travel: parça başına katman başına ~0.25 s (k>1)
-    const travel = k > 1 ? layerCount * (k - 1) * 0.25 : 0
-    const t = extrude + k * supportTimePart + layerCount * spec.layerChangeSec + colorChangesPlate * spec.colorChangeTimeSec + travel
+    // Parçalar arası travel: ≤3 parçada ihmal, 10+ parçada baskı süresinin ~%2–5'i
+    const travelFactor = k > 3 ? Math.min(0.05, 0.006 * (k - 3)) : 0
+    const t = (extrude + k * supportTimePart) * (1 + travelFactor) + layerCount * spec.layerChangeSec + colorChangesPlate * spec.colorChangeTimeSec
     return spec.jobOverheadSec + t * settings.timeMultiplier
   }
   const plateWasteGrams = spec.jobWasteGrams + colorChangesPlate * spec.colorChangeWasteGrams
@@ -194,17 +194,22 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams })
   const partWasteGrams = (partGrams + partSupportGrams) * wasteRatio
 
   // --- Tabla planı ---
-  const partsPerPlate = plateCapacity(stats, printer, settings.resinPartSpacingMm, settings.plateMarginMm)
+  // Büyük taban alanlı parçalarda (>40 cm²) ayrılma kuvveti için parça aralığı 15 mm'e çıkarılır
+  const footprint = stats.size.x * stats.size.y
+  const spacing = footprint > 4000 ? Math.max(settings.resinPartSpacingMm, 15) : settings.resinPartSpacingMm
+  const partsPerPlate = plateCapacity(stats, printer, spacing, settings.plateMarginMm)
   const { plates, loads } = planPlates(qty, partsPerPlate)
   const plateArea = printer.bed.x * printer.bed.y
 
-  /** k parçalı tabla süresi: katman sayısına bağlı; kaplama arttıkça ayrılma kuvveti için kaldırma döngüsü uzar */
+  /** k parçalı tabla süresi: katman sayısına bağlı, parça sayısından bağımsız.
+   *  Statik ayırmalı makinelerde kaplama arttıkça rest/lift yavaşlatması: ×(1 + ceza × kaplama), üst sınır +%30. */
   const plateTime = (k: number) => {
-    const coverage = Math.min(1, (k * stats.layers.maxArea) / plateArea)
-    const lift = params.liftCycleSec * (1 + settings.resinLiftAreaPenalty * coverage)
+    const fill = Math.min(1, (k * footprint) / plateArea)
+    const penalty = spec.tiltRelease ? 0 : Math.min(0.3, settings.resinLiftAreaPenalty * fill)
     const bottom = Math.min(params.bottomLayers, layerCount)
     const normal = layerCount - bottom
-    return 60 + (bottom * (params.bottomExposureSec + lift) + normal * (params.exposureSec + lift)) * settings.timeMultiplier
+    const layersTime = bottom * (params.bottomExposureSec + params.liftCycleSec) + normal * (params.exposureSec + params.liftCycleSec)
+    return 60 + layersTime * (1 + penalty) * settings.timeMultiplier
   }
   let totalTime = 0, totalEnergy = 0
   for (const k of loads) {
@@ -221,7 +226,7 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams })
   lines.push({ key: 'material', label: 'Model reçinesi', amount: partGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partGrams.toFixed(1)} g ${material.name}${hollowSaved > 0 ? ` (boşaltma ile ${gramsFromMm3(hollowSaved, material.density).toFixed(0)} g/adet tasarruf)` : ''}` })
   if (partSupportGrams > 0) lines.push({ key: 'support', label: 'Destek reçinesi', amount: partSupportGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partSupportGrams.toFixed(1)} g` })
   lines.push({ key: 'waste', label: 'İsraf (yıkama kaybı)', amount: partWasteGrams * qty * price, detail: `${(partWasteGrams * qty).toFixed(1)} g` })
-  const ipaLiters = plates * settings.ipaLitersPerPrintBase + qty * (stats.surfaceArea / 100000) * 0.05
+  const ipaLiters = qty * (settings.ipaLitersPerPrintBase + (stats.surfaceArea / 100000) * 0.05)
   lines.push({ key: 'ipa', label: 'IPA / yıkama', amount: ipaLiters * settings.ipaTRYPerLiter, detail: `${(ipaLiters * 1000).toFixed(0)} ml` })
   lines.push({ key: 'energy', label: 'Elektrik', amount: totalEnergy * settings.electricityTRYPerKWh, detail: `${totalEnergy.toFixed(2)} kWh` })
   const hours = totalTime / 3600
@@ -256,8 +261,8 @@ function finalize(a: {
   const { settings, stats, printer, qty } = a
   const lines = [...a.lines]
   const direct = lines.reduce((s, l) => s + l.amount, 0)
-  if (settings.failureRate > 0) {
-    const fr = settings.failureRate
+  const fr = a.tech === 'resin' ? settings.resinFailureRate : settings.failureRate
+  if (fr > 0) {
     lines.push({ key: 'failure', label: 'Başarısız baskı riski', amount: direct * (fr / (1 - fr)), detail: `%${(fr * 100).toFixed(0)}` })
   }
   if (settings.packagingTRY > 0) lines.push({ key: 'packaging', label: 'Ambalaj', amount: settings.packagingTRY * qty, detail: qty > 1 ? `${qty} × ${settings.packagingTRY} ₺` : undefined })

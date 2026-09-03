@@ -23,7 +23,7 @@ export const PRINTERS: PrinterProfile[] = [
       efficiencyScale: 1.0,    // 500 mm/s, 10 000 mm/s² (profil ivmesi 6 000)
       outerWallSpeed: 200,     // 0.20 mm Standard @BBL A1
       layerChangeSec: 1.5,
-      jobOverheadSec: 420,     // ısınma + otomatik kalibrasyon + purge (~7 dk; Studio prep compensation 260 s)
+      jobOverheadSec: 300,     // ısınma + titreşim testi + bed leveling + purge: 3–6 dk (forum ölçümleri)
       jobWasteGrams: 1.0,      // purge hattı (G1 E50 ≈ 0.15 g) + nozul temizliği + skirt
       colorChangeWasteGrams: 0.8, // flush 280–600 mm³ + prime tower payı (~0.4–0.8 g); dark→light 1.0+
       colorChangeTimeSec: 75,  // AMS lite yükle/boşalt ~1–1.5 dk
@@ -49,7 +49,7 @@ export const PRINTERS: PrinterProfile[] = [
       efficiencyScale: 1.15,
       outerWallSpeed: 200,
       layerChangeSec: 1.2,
-      jobOverheadSec: 600,     // ısıtmalı kasa (65 °C) + kalibrasyon
+      jobOverheadSec: 540,     // kalibrasyon 6–8 dk (X serisi) + ısıtmalı kasa (65 °C) ön ısıtma
       jobWasteGrams: 1.5,
       colorChangeWasteGrams: 0.4, // çift nozul: 2 renkte hotend flush yok, prime tower var; >2 renkte AMS purge devreye girer
       colorChangeTimeSec: 20,
@@ -80,8 +80,9 @@ export const PRINTERS: PrinterProfile[] = [
       vatCapacityMl: 1500,     // yayınlanmadı; otomatik besleme 2 kg şişeden
       avgPowerW: 150,          // ölçüm yok; PSU 300 W; LCD + COB UV + vat ısıtıcı tahmini
       postPowerW: 60,          // yıkama/kürleme istasyonu
+      tiltRelease: true,       // eğimli ayırma: kaldırma parametresi elle ayarlanmaz, kaplama cezası yok
     },
-    notes: 'Otomatik reçine besleme/geri alma, 30 °C ısıtmalı vat. Maks hız 70 mm/sa.',
+    notes: 'Otomatik reçine besleme/geri alma, 30 °C ısıtmalı vat, tilt-release. Maks hız 70 mm/sa. Süre parça sayısından bağımsız, sadece yüksekliğe bağlıdır.',
   },
 ]
 
