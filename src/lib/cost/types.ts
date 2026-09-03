@@ -138,6 +138,17 @@ export interface BusinessSettings {
   quantity: number
   /** Süre kalibrasyon çarpanı (dilimleyici/gerçek baskıya göre ayarlayın), 1 = model tahmini */
   timeMultiplier: number
+  /** Tabla yerleşimi: parçalar arası boşluk (mm) */
+  fdmPartSpacingMm: number
+  resinPartSpacingMm: number
+  /** Tabla kenar payı (mm) */
+  plateMarginMm: number
+  /** Parça başına ek işçilik (tabladan alma, temizlik) dk — FDM */
+  fdmPerPartMinutes: number
+  /** Parça başına destek sökme/temizlik dk — reçine */
+  resinPerPartMinutes: number
+  /** Reçine: tabla kaplama oranı 1.0 iken kaldırma döngüsüne eklenen oran (ayrılma kuvveti) */
+  resinLiftAreaPenalty: number
 }
 
 export interface CostLine {
@@ -147,27 +158,37 @@ export interface CostLine {
   detail?: string
 }
 
-export interface Estimate {
-  tech: Tech
-  /** Malzeme */
+export interface EstimateTotals {
   materialGrams: number
-  materialVolumeMm3: number
   supportGrams: number
   wasteGrams: number
-  /** Süre */
   printTimeSec: number
-  layerCount: number
-  /** Enerji */
   energyKWh: number
-  /** Maliyet kalemleri (tek parça) */
+  cost: number
+  price: number
+  priceWithVat: number
+}
+
+export interface Estimate {
+  tech: Tech
+  quantity: number
+  /** Tabla başına sığan parça sayısı ve gereken tabla (iş) sayısı */
+  partsPerPlate: number
+  plates: number
+  /** Tek parçanın tek başına basılması (referans) */
+  single: { printTimeSec: number; materialGrams: number }
+  /** Dolu bir tablanın süresi */
+  plateTimeSec: number
+  /** Sipariş toplamı */
+  total: EstimateTotals
+  /** Adet başına ortalama (toplam ÷ adet) */
+  perUnit: EstimateTotals
+  /** Basılan malzeme hacmi, adet başına mm³ */
+  materialVolumeMm3: number
+  layerCount: number
+  /** Maliyet kalemleri (sipariş toplamı) */
   lines: CostLine[]
-  costPerUnit: number
-  pricePerUnit: number
-  pricePerUnitWithVat: number
-  totalPrice: number
-  totalPriceWithVat: number
   warnings: string[]
-  /** Sığdı mı */
   fits: boolean
   fitsRotated: boolean
   breakdown: Record<string, number>

@@ -183,7 +183,13 @@ export default function App() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-[11px] uppercase text-zinc-500">
-                    <tr><th className="py-1 pr-2">Yazıcı</th><th className="py-1 pr-2">Malzeme</th><th className="py-1 pr-2 text-right">Gram</th><th className="py-1 pr-2 text-right">Süre</th><th className="py-1 pr-2 text-right">Maliyet</th><th className="py-1 text-right">Fiyat</th></tr>
+                    <tr>
+                      <th className="py-1 pr-2">Yazıcı</th><th className="py-1 pr-2">Malzeme</th>
+                      <th className="py-1 pr-2 text-right">Gram/adet</th><th className="py-1 pr-2 text-right">{settings.quantity > 1 ? 'Toplam süre' : 'Süre'}</th>
+                      {settings.quantity > 1 && <th className="py-1 pr-2 text-right">Tabla</th>}
+                      <th className="py-1 pr-2 text-right">Fiyat/adet</th>
+                      {settings.quantity > 1 && <th className="py-1 text-right">Toplam ({settings.quantity} adet)</th>}
+                    </tr>
                   </thead>
                   <tbody>
                     {comparison.map(({ printer: p, material: m, est }) => (
@@ -193,10 +199,11 @@ export default function App() {
                           {!est.fitsRotated && <span className="ml-1 text-[11px] text-red-300">sığmaz</span>}
                         </td>
                         <td className="py-1.5 pr-2 text-xs text-zinc-400">{m.name}</td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">{est.materialGrams.toFixed(0)} g</td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">{fmtDur(est.printTimeSec)}</td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">{est.costPerUnit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>
-                        <td className="py-1.5 text-right font-semibold tabular-nums">{est.pricePerUnit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.materialGrams.toFixed(0)} g</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{fmtDur(est.total.printTimeSec)}</td>
+                        {settings.quantity > 1 && <td className="py-1.5 pr-2 text-right tabular-nums text-xs text-zinc-400">{est.plates} × {est.partsPerPlate}</td>}
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>
+                        {settings.quantity > 1 && <td className="py-1.5 text-right font-semibold tabular-nums">{est.total.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>}
                       </tr>
                     ))}
                   </tbody>
