@@ -1,5 +1,8 @@
 export type Tech = 'fdm' | 'resin'
 
+/** i18n çeviri fonksiyonu (framework-agnostic; engine/pdf'e parametre olarak geçilir) */
+export type Translate = (key: string, params?: Record<string, string | number>) => string
+
 export interface BedSize { x: number; y: number; z: number }
 
 export interface FdmPrinterSpec {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FdmPrinterSpec, PrinterProfile, ResinPrinterSpec, Tech } from '../lib/cost/types.ts'
 import { Button, Field, NumberInput, Select, Toggle } from './ui.tsx'
+import { useI18n } from '../lib/i18n/index.tsx'
 
 interface Props {
   open: boolean
@@ -62,6 +63,8 @@ const RESIN_FIELDS: NumField<ResinPrinterSpec>[] = [
 ]
 
 export function PrinterEditor({ open, initial, templates, onSave, onDelete, onClose }: Props) {
+  const { t } = useI18n()
+  const hintOf = (k: string) => { const v = t(k); return v === k ? undefined : v }
   // Bileşen, App tarafında `key` ile her açılışta yeniden oluşturulur; bu yüzden state doğrudan initial'dan başlar.
   const [p, setP] = useState<PrinterProfile>(() => initial ?? blank('fdm'))
   const [templateId, setTemplateId] = useState('')
@@ -78,9 +81,9 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
   const setSpec = (k: string, v: number | boolean) => setP({ ...p, spec: { ...p.spec, [k]: v } as PrinterProfile['spec'] })
   const applyTemplate = (id: string) => {
     setTemplateId(id)
-    const t = templates.find((x) => x.id === id)
-    if (!t) return
-    setP({ ...structuredClone(t), id: p.id, name: p.name || `${t.name} (kopya)`, brand: p.brand || t.brand })
+    const tpl = templates.find((x) => x.id === id)
+    if (!tpl) return
+    setP({ ...structuredClone(tpl), id: p.id, name: p.name || t('printerEditor.copySuffix', { name: tpl.name }), brand: p.brand || tpl.brand })
   }
   const changeTech = (tech: Tech) => {
     if (tech === p.tech) return
@@ -88,9 +91,9 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
     setP({ ...p, tech, bed: b.bed, lifetimeHours: b.lifetimeHours, maintenanceTRYPerHour: b.maintenanceTRYPerHour, spec: b.spec })
   }
   const save = () => {
-    if (!p.name.trim()) { setError('Yazıcı adı gerekli.'); return }
-    if (p.bed.x <= 0 || p.bed.y <= 0 || p.bed.z <= 0) { setError('Tabla ölçüleri pozitif olmalı.'); return }
-    if (p.priceTRY < 0 || p.lifetimeHours <= 0) { setError('Fiyat ve ömür geçerli olmalı.'); return }
+    if (!p.name.trim()) { setError(t('printerEditor.errNameRequired')); return }
+    if (p.bed.x <= 0 || p.bed.y <= 0 || p.bed.z <= 0) { setError(t('printerEditor.errBedPositive')); return }
+    if (p.priceTRY < 0 || p.lifetimeHours <= 0) { setError(t('printerEditor.errPriceLifetime')); return }
     onSave({ ...p, id: p.id || `custom-${Date.now().toString(36)}`, name: p.name.trim(), brand: p.brand.trim() })
   }
 
@@ -99,47 +102,47 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
       <div className="my-6 w-full max-w-3xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <div>
-            <h2 className="text-base font-semibold">{initial ? 'Yazıcıyı düzenle' : 'Yazıcı ekle'}</h2>
-            <p className="text-[11px] text-zinc-500">Yalnızca bu tarayıcıda saklanır; başka kimse görmez.</p>
+            <h2 className="text-base font-semibold">{initial ? t('printerEditor.editTitle') : t('printerEditor.addTitle')}</h2>
+            <p className="text-[11px] text-zinc-500">{t('printerEditor.subtitle')}</p>
           </div>
           <div className="flex gap-2">
-            {initial && onDelete && <Button variant="danger" onClick={() => { if (confirm(`"${initial.name}" silinsin mi?`)) onDelete(initial.id) }}>Sil</Button>}
-            <Button variant="ghost" onClick={onClose}>Vazgeç</Button>
-            <Button variant="primary" onClick={save}>Kaydet</Button>
+            {initial && onDelete && <Button variant="danger" onClick={() => { if (confirm(t('printerEditor.confirmDelete', { name: initial.name }))) onDelete(initial.id) }}>{t('printerEditor.delete')}</Button>}
+            <Button variant="ghost" onClick={onClose}>{t('printerEditor.cancel')}</Button>
+            <Button variant="primary" onClick={save}>{t('printerEditor.save')}</Button>
           </div>
         </header>
         <div className="space-y-5 p-5">
           {error && <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">{error}</div>}
           {!initial && (
-            <Field label="Şablondan başla (isteğe bağlı)" hint="Benzer bir yazıcının değerlerini kopyalar; sonra düzenleyebilirsiniz.">
-              <Select value={templateId} onChange={applyTemplate} options={[{ value: '', label: 'Boş' }, ...templates.map((t) => ({ value: t.id, label: `${t.brand} ${t.name} (${t.tech === 'fdm' ? 'FDM' : 'Reçine'})` }))]} />
+            <Field label={t('printerEditor.fromTemplate')} hint={t('printerEditor.fromTemplateHint')}>
+              <Select value={templateId} onChange={applyTemplate} options={[{ value: '', label: t('printerEditor.blank') }, ...templates.map((x) => ({ value: x.id, label: `${x.brand} ${x.name} (${x.tech === 'fdm' ? t('tech.fdm') : t('tech.resin')})` }))]} />
             </Field>
           )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <Field label="Marka"><input value={p.brand} onChange={(e) => setP({ ...p, brand: e.target.value })} placeholder="Creality" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
-            <Field label="Model adı *"><input value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} placeholder="Ender 3 V3" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
-            <Field label="Teknoloji">
-              <Select value={p.tech} onChange={changeTech} options={[{ value: 'fdm', label: 'FDM (filament)' }, { value: 'resin', label: 'Reçine (MSLA/SLA)' }]} />
+            <Field label={t('printerEditor.brand')}><input value={p.brand} onChange={(e) => setP({ ...p, brand: e.target.value })} placeholder={t('printerEditor.brandPlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+            <Field label={t('printerEditor.modelName')}><input value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} placeholder={t('printerEditor.modelNamePlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+            <Field label={t('printerEditor.tech')}>
+              <Select value={p.tech} onChange={changeTech} options={[{ value: 'fdm', label: t('printerEditor.techFdm') }, { value: 'resin', label: t('printerEditor.techResin') }]} />
             </Field>
-            <Field label="Tabla X"><NumberInput value={p.bed.x} onChange={(v) => setBed('x', v)} min={1} step={1} suffix="mm" /></Field>
-            <Field label="Tabla Y"><NumberInput value={p.bed.y} onChange={(v) => setBed('y', v)} min={1} step={1} suffix="mm" /></Field>
-            <Field label="Yükseklik Z"><NumberInput value={p.bed.z} onChange={(v) => setBed('z', v)} min={1} step={1} suffix="mm" /></Field>
-            <Field label="Satın alma fiyatı"><NumberInput value={p.priceTRY} onChange={(v) => setP({ ...p, priceTRY: v })} min={0} step={500} suffix="₺" /></Field>
-            <Field label="Kullanım ömrü" hint="Amortisman için"><NumberInput value={p.lifetimeHours} onChange={(v) => setP({ ...p, lifetimeHours: v })} min={100} step={100} suffix="sa" /></Field>
-            <Field label="Bakım & sarf"><NumberInput value={p.maintenanceTRYPerHour} onChange={(v) => setP({ ...p, maintenanceTRYPerHour: v })} min={0} step={0.5} suffix="₺/sa" /></Field>
+            <Field label={t('printerEditor.bedX')}><NumberInput value={p.bed.x} onChange={(v) => setBed('x', v)} min={1} step={1} suffix="mm" /></Field>
+            <Field label={t('printerEditor.bedY')}><NumberInput value={p.bed.y} onChange={(v) => setBed('y', v)} min={1} step={1} suffix="mm" /></Field>
+            <Field label={t('printerEditor.bedZ')}><NumberInput value={p.bed.z} onChange={(v) => setBed('z', v)} min={1} step={1} suffix="mm" /></Field>
+            <Field label={t('printerEditor.price')}><NumberInput value={p.priceTRY} onChange={(v) => setP({ ...p, priceTRY: v })} min={0} step={500} suffix="₺" /></Field>
+            <Field label={t('printerEditor.lifetime')} hint={t('printerEditor.lifetimeHint')}><NumberInput value={p.lifetimeHours} onChange={(v) => setP({ ...p, lifetimeHours: v })} min={100} step={100} suffix="sa" /></Field>
+            <Field label={t('printerEditor.maintenance')}><NumberInput value={p.maintenanceTRYPerHour} onChange={(v) => setP({ ...p, maintenanceTRYPerHour: v })} min={0} step={0.5} suffix="₺/sa" /></Field>
           </div>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{p.tech === 'fdm' ? 'FDM parametreleri' : 'Reçine parametreleri'}</h3>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{p.tech === 'fdm' ? t('printerEditor.fdmParams') : t('printerEditor.resinParams')}</h3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               {p.tech === 'fdm'
                 ? FDM_FIELDS.map((f) => (
-                    <Field key={f.key} label={f.label} hint={f.hint}>
+                    <Field key={f.key} label={t('printerEditor.fdm.' + f.key)} hint={hintOf('printerEditor.fdm.' + f.key + 'Hint')}>
                       <NumberInput value={(p.spec as FdmPrinterSpec)[f.key]} onChange={(v) => setSpec(f.key, v)} step={f.step} suffix={f.suffix} />
                     </Field>
                   ))
                 : RESIN_FIELDS.map((f) => (
-                    <Field key={f.key} label={f.label} hint={f.hint}>
+                    <Field key={f.key} label={t('printerEditor.resin.' + f.key)} hint={hintOf('printerEditor.resin.' + f.key + 'Hint')}>
                       <NumberInput value={(p.spec as ResinPrinterSpec)[f.key]} onChange={(v) => setSpec(f.key, v)} step={f.step} suffix={f.suffix} />
                     </Field>
                   ))}
@@ -147,13 +150,13 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
             <div className="mt-3">
               {p.tech === 'fdm'
                 ? <div className="space-y-2">
-                    <Toggle checked={(p.spec as FdmPrinterSpec).supportsMultiColor} onChange={(v) => setSpec('supportsMultiColor', v)} label="Çok renkli sistem var (AMS / MMU / CFS)" />
-                    <Toggle checked={(p.spec as FdmPrinterSpec).dualNozzle} onChange={(v) => setSpec('dualNozzle', v)} label="Çift nozul / IDEX (2 renk flush'sız basılır)" />
+                    <Toggle checked={(p.spec as FdmPrinterSpec).supportsMultiColor} onChange={(v) => setSpec('supportsMultiColor', v)} label={t('printerEditor.multiColor')} />
+                    <Toggle checked={(p.spec as FdmPrinterSpec).dualNozzle} onChange={(v) => setSpec('dualNozzle', v)} label={t('printerEditor.dualNozzle')} />
                   </div>
-                : <Toggle checked={(p.spec as ResinPrinterSpec).tiltRelease} onChange={(v) => setSpec('tiltRelease', v)} label="Tilt-release (eğimli ayırma) var — dolu tablada kaldırma cezası uygulanmaz" />}
+                : <Toggle checked={(p.spec as ResinPrinterSpec).tiltRelease} onChange={(v) => setSpec('tiltRelease', v)} label={t('printerEditor.tiltRelease')} />}
             </div>
           </section>
-          <Field label="Not (isteğe bağlı)">
+          <Field label={t('printerEditor.note')}>
             <input value={p.notes ?? ''} onChange={(e) => setP({ ...p, notes: e.target.value })} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" />
           </Field>
         </div>

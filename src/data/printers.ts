@@ -90,6 +90,170 @@ export const PRINTERS: PrinterProfile[] = [
     },
     notes: 'Otomatik reçine besleme/geri alma, 30 °C ısıtmalı vat, tilt-release. Maks hız 70 mm/sa. Süre parça sayısından bağımsız, sadece yüksekliğe bağlıdır.',
   },
+  {
+    id: 'bambu-p1s-combo',
+    name: 'P1S Combo',
+    brand: 'Bambu Lab',
+    tech: 'fdm',
+    bed: { x: 256, y: 256, z: 256 },
+    priceTRY: 44000,          // AMS dahil Combo, TR perakende KDV dahil (Akakçe/Metatech, Eyl 2026)
+    lifetimeHours: 6000,
+    maintenanceTRYPerHour: 3,
+    spec: {
+      tech: 'fdm',
+      maxFlow: 32,             // kapalı kasa CoreXY, sertleştirilmiş nozul; PLA profili ~21 ile sınırlı
+      efficiencyScale: 1.1,    // 500 mm/s, input shaping ile ~20 000 mm/s²
+      outerWallSpeed: 200,
+      layerChangeSec: 1.3,
+      jobOverheadSec: 300,
+      jobWasteGrams: 1.0,
+      colorChangeWasteGrams: 0.6, // AMS flush (tek nozul) A1'den biraz yüksek
+      colorChangeTimeSec: 45,
+      nozzleDiameter: 0.4,
+      supportsMultiColor: true,
+      dualNozzle: false,
+      nozzleSwitchWasteGrams: 0,
+      nozzleSwitchTimeSec: 0,
+      avgPowerW: 110,          // kapalı kasa CoreXY, PLA sürekli
+      heatupPowerW: 350,
+    },
+    notes: 'Kapalı kasa CoreXY, AMS 4 renk. Tek nozul: renk değişiminde flush israfı olur. ABS/ASA için ideal.',
+  },
+  {
+    id: 'creality-ender3-v3-ke',
+    name: 'Ender-3 V3 KE',
+    brand: 'Creality',
+    tech: 'fdm',
+    bed: { x: 220, y: 220, z: 240 },
+    priceTRY: 34000,          // TR perakende KDV dahil (Akakçe/Cimri, Eyl 2026)
+    lifetimeHours: 4000,
+    maintenanceTRYPerHour: 2,
+    spec: {
+      tech: 'fdm',
+      maxFlow: 24,             // 60 W seramik ısıtıcı, yüksek akışlı nozul
+      efficiencyScale: 0.95,   // açık kasa, Klipper 500 mm/s, ~8 000 mm/s²
+      outerWallSpeed: 180,
+      layerChangeSec: 1.6,
+      jobOverheadSec: 240,
+      jobWasteGrams: 0.8,      // prime hattı
+      colorChangeWasteGrams: 0,
+      colorChangeTimeSec: 0,
+      nozzleDiameter: 0.4,
+      supportsMultiColor: false,
+      dualNozzle: false,
+      nozzleSwitchWasteGrams: 0,
+      nozzleSwitchTimeSec: 0,
+      avgPowerW: 110,          // 350 W yatak + hotend, PLA ortalama
+      heatupPowerW: 300,
+    },
+    notes: 'Açık kasa, Klipper tabanlı hızlı yazıcı. Tek renk. Fiyat/performans için popüler giriş seviyesi.',
+  },
+  {
+    id: 'anycubic-kobra3-combo',
+    name: 'Kobra 3 Combo',
+    brand: 'Anycubic',
+    tech: 'fdm',
+    bed: { x: 250, y: 250, z: 260 },
+    priceTRY: 20000,          // ACE Pro dahil Combo, TR perakende KDV dahil (Akakçe/Porima, Eyl 2026)
+    lifetimeHours: 4000,
+    maintenanceTRYPerHour: 2,
+    spec: {
+      tech: 'fdm',
+      maxFlow: 28,             // 600 mm/s, yüksek akışlı hotend
+      efficiencyScale: 1.0,
+      outerWallSpeed: 180,
+      layerChangeSec: 1.5,
+      jobOverheadSec: 300,
+      jobWasteGrams: 1.2,
+      colorChangeWasteGrams: 1.2, // ACE Pro flush yüksektir (tek nozul, 4 renk)
+      colorChangeTimeSec: 60,
+      nozzleDiameter: 0.4,
+      supportsMultiColor: true,
+      dualNozzle: false,
+      nozzleSwitchWasteGrams: 0,
+      nozzleSwitchTimeSec: 0,
+      avgPowerW: 100,
+      heatupPowerW: 300,
+    },
+    notes: 'Açık kasa, ACE Pro ile 4 renk. Renk değişimlerinde flush israfı yüksektir. Geniş 250 mm tabla.',
+  },
+  {
+    id: 'prusa-core-one',
+    name: 'Core One',
+    brand: 'Prusa',
+    tech: 'fdm',
+    bed: { x: 250, y: 220, z: 270 },
+    priceTRY: 105000,         // Kit, TR distribütör KDV dahil (Metatech, Eyl 2026)
+    lifetimeHours: 8000,
+    maintenanceTRYPerHour: 3.5,
+    spec: {
+      tech: 'fdm',
+      maxFlow: 24,             // Nextruder, 0.4 nozul
+      efficiencyScale: 1.05,   // kapalı CoreXY, ~500 mm/s
+      outerWallSpeed: 180,
+      layerChangeSec: 1.4,
+      jobOverheadSec: 360,     // mesh bed leveling + kasa ön ısıtma
+      jobWasteGrams: 1.2,      // purge hattı
+      colorChangeWasteGrams: 0,
+      colorChangeTimeSec: 0,
+      nozzleDiameter: 0.4,
+      supportsMultiColor: false, // MMU3 opsiyonel; standartta tek renk
+      dualNozzle: false,
+      nozzleSwitchWasteGrams: 0,
+      nozzleSwitchTimeSec: 0,
+      avgPowerW: 120,
+      heatupPowerW: 350,
+    },
+    notes: 'Kapalı kasa CoreXY, aktif hazne sıcaklığı. Mühendislik malzemeleri (ASA/ABS/PC/PA) için uygun. MMU3 ile çok renk eklenebilir.',
+  },
+  {
+    id: 'elegoo-saturn4-ultra-16k',
+    name: 'Saturn 4 Ultra 16K',
+    brand: 'Elegoo',
+    tech: 'resin',
+    bed: { x: 218.88, y: 122.88, z: 220 },
+    priceTRY: 26000,          // 16K, TR perakende KDV dahil (Akakçe/İncehesap, Eyl 2026)
+    lifetimeHours: 2500,       // LCD ömrü
+    maintenanceTRYPerHour: 6,  // LCD + FEP + sarf
+    spec: {
+      tech: 'resin',
+      pixelSizeMm: 0.019,      // 19 µm, 16K 10"
+      defaultLayerHeight: 0.05,
+      exposureSec: 2.5,
+      bottomExposureSec: 24,
+      bottomLayers: 5,
+      liftCycleSec: 6.0,       // tilt-release, hızlı kaldırma
+      vatCapacityMl: 500,
+      avgPowerW: 120,
+      postPowerW: 60,
+      tiltRelease: true,
+    },
+    notes: 'Tilt-release ayırma, yüksek hızlı 16K MSLA. Masaüstü sınıfının en popüler reçine yazıcılarından. Süre yüksekliğe bağlıdır.',
+  },
+  {
+    id: 'elegoo-mars5-ultra-9k',
+    name: 'Mars 5 Ultra 9K',
+    brand: 'Elegoo',
+    tech: 'resin',
+    bed: { x: 153.36, y: 77.76, z: 165 },
+    priceTRY: 20000,          // 9K, TR perakende KDV dahil (Akakçe/Cimri, Eyl 2026)
+    lifetimeHours: 2200,
+    maintenanceTRYPerHour: 5,
+    spec: {
+      tech: 'resin',
+      pixelSizeMm: 0.018,      // 18 µm, 9K 7"
+      defaultLayerHeight: 0.05,
+      exposureSec: 2.5,
+      bottomExposureSec: 25,
+      bottomLayers: 5,
+      liftCycleSec: 6.5,       // tilt-release
+      vatCapacityMl: 200,
+      avgPowerW: 100,
+      postPowerW: 60,
+      tiltRelease: true,
+    },
+    notes: 'Kompakt 9K MSLA, tilt-release. Küçük/orta parçalar için popüler. Süre yüksekliğe bağlıdır.',
+  },
 ]
 
 export const printerById = (id: string) => PRINTERS.find((p) => p.id === id) ?? PRINTERS[0]

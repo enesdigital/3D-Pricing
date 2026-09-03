@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Material, Tech } from '../lib/cost/types.ts'
 import { Button, Field, NumberInput, Select } from './ui.tsx'
+import { useI18n } from '../lib/i18n/index.tsx'
 
 interface Props {
   open: boolean
@@ -19,6 +20,7 @@ const blank = (tech: Tech): Material =>
     : { id: '', name: '', tech, density: 1.1, pricePerKgTRY: 1000, maxFlow: 0, minLayerTime: 0, powerFactor: 1 }
 
 export function MaterialEditor({ open, initial, templates, defaultTech, onSave, onDelete, onClose }: Props) {
+  const { t } = useI18n()
   // App tarafında `key` ile her açılışta yeniden oluşturulur
   const [m, setM] = useState<Material>(() => initial ?? blank(defaultTech))
   const [templateId, setTemplateId] = useState('')
@@ -34,15 +36,15 @@ export function MaterialEditor({ open, initial, templates, defaultTech, onSave, 
 
   const applyTemplate = (id: string) => {
     setTemplateId(id)
-    const t = templates.find((x) => x.id === id)
-    if (!t) return
-    setM({ ...t, id: m.id, name: m.name || `${t.name} (kopya)` })
+    const tpl = templates.find((x) => x.id === id)
+    if (!tpl) return
+    setM({ ...tpl, id: m.id, name: m.name || t('materialEditor.copySuffix', { name: tpl.name }) })
   }
   const changeTech = (tech: Tech) => { if (tech !== m.tech) setM({ ...blank(tech), id: m.id, name: m.name, notes: m.notes }) }
   const save = () => {
-    if (!m.name.trim()) { setError('Malzeme adı gerekli.'); return }
-    if (m.density <= 0 || m.pricePerKgTRY < 0) { setError('Yoğunluk pozitif, fiyat negatif olmayan bir değer olmalı.'); return }
-    if (m.tech === 'fdm' && m.maxFlow <= 0) { setError('FDM malzeme için maksimum akış pozitif olmalı.'); return }
+    if (!m.name.trim()) { setError(t('materialEditor.errNameRequired')); return }
+    if (m.density <= 0 || m.pricePerKgTRY < 0) { setError(t('materialEditor.errDensityPrice')); return }
+    if (m.tech === 'fdm' && m.maxFlow <= 0) { setError(t('materialEditor.errMaxFlow')); return }
     onSave({ ...m, id: m.id || `custom-${Date.now().toString(36)}`, name: m.name.trim() })
   }
   const input = (value: string, set: (v: string) => void, placeholder?: string) => (
@@ -54,36 +56,36 @@ export function MaterialEditor({ open, initial, templates, defaultTech, onSave, 
       <div className="my-6 w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <div>
-            <h2 className="text-base font-semibold">{initial ? 'Malzemeyi düzenle' : 'Malzeme ekle'}</h2>
-            <p className="text-[11px] text-zinc-500">Yalnızca bu tarayıcıda saklanır; başka kimse görmez.</p>
+            <h2 className="text-base font-semibold">{initial ? t('materialEditor.editTitle') : t('materialEditor.addTitle')}</h2>
+            <p className="text-[11px] text-zinc-500">{t('materialEditor.subtitle')}</p>
           </div>
           <div className="flex gap-2">
-            {initial && onDelete && <Button variant="danger" onClick={() => { if (confirm(`"${initial.name}" silinsin mi?`)) onDelete(initial.id) }}>Sil</Button>}
-            <Button variant="ghost" onClick={onClose}>Vazgeç</Button>
-            <Button variant="primary" onClick={save}>Kaydet</Button>
+            {initial && onDelete && <Button variant="danger" onClick={() => { if (confirm(t('materialEditor.confirmDelete', { name: initial.name }))) onDelete(initial.id) }}>{t('materialEditor.delete')}</Button>}
+            <Button variant="ghost" onClick={onClose}>{t('materialEditor.cancel')}</Button>
+            <Button variant="primary" onClick={save}>{t('materialEditor.save')}</Button>
           </div>
         </header>
         <div className="space-y-5 p-5">
           {error && <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">{error}</div>}
           {!initial && (
-            <Field label="Şablondan başla (isteğe bağlı)" hint="Benzer bir malzemenin değerlerini kopyalar.">
-              <Select value={templateId} onChange={applyTemplate} options={[{ value: '', label: 'Boş' }, ...templates.map((t) => ({ value: t.id, label: `${t.name} (${t.tech === 'fdm' ? 'FDM' : 'Reçine'})` }))]} />
+            <Field label={t('materialEditor.fromTemplate')} hint={t('materialEditor.fromTemplateHint')}>
+              <Select value={templateId} onChange={applyTemplate} options={[{ value: '', label: t('materialEditor.blank') }, ...templates.map((x) => ({ value: x.id, label: `${x.name} (${x.tech === 'fdm' ? t('tech.fdm') : t('tech.resin')})` }))]} />
             </Field>
           )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <div className="col-span-2"><Field label="Malzeme adı *">{input(m.name, (v) => setM({ ...m, name: v }), 'Örn. Porima PLA Mat Siyah')}</Field></div>
-            <Field label="Teknoloji"><Select value={m.tech} onChange={changeTech} options={[{ value: 'fdm', label: 'FDM (filament)' }, { value: 'resin', label: 'Reçine' }]} /></Field>
-            <Field label="Yoğunluk" hint="PLA 1.24 · PETG 1.27 · ABS 1.04 · TPU 1.21 · reçine ~1.10"><NumberInput value={m.density} onChange={(v) => setM({ ...m, density: v })} min={0.5} max={3} step={0.01} suffix="g/cm³" /></Field>
-            <Field label="Fiyat" hint="1 kg, KDV dahil"><NumberInput value={m.pricePerKgTRY} onChange={(v) => setM({ ...m, pricePerKgTRY: v })} min={0} step={10} suffix="₺/kg" /></Field>
-            <Field label="Güç çarpanı" hint="PLA 1.0 · PETG 1.15 · ABS/ASA 1.9 · PC/PA 2.0"><NumberInput value={m.powerFactor} onChange={(v) => setM({ ...m, powerFactor: v })} min={0.5} max={3} step={0.05} suffix="×" /></Field>
+            <div className="col-span-2"><Field label={t('materialEditor.name')}>{input(m.name, (v) => setM({ ...m, name: v }), t('materialEditor.namePlaceholder'))}</Field></div>
+            <Field label={t('materialEditor.tech')}><Select value={m.tech} onChange={changeTech} options={[{ value: 'fdm', label: t('materialEditor.techFdm') }, { value: 'resin', label: t('materialEditor.techResin') }]} /></Field>
+            <Field label={t('materialEditor.density')} hint={t('materialEditor.densityHint')}><NumberInput value={m.density} onChange={(v) => setM({ ...m, density: v })} min={0.5} max={3} step={0.01} suffix="g/cm³" /></Field>
+            <Field label={t('materialEditor.price')} hint={t('materialEditor.priceHint')}><NumberInput value={m.pricePerKgTRY} onChange={(v) => setM({ ...m, pricePerKgTRY: v })} min={0} step={10} suffix="₺/kg" /></Field>
+            <Field label={t('materialEditor.powerFactor')} hint={t('materialEditor.powerFactorHint')}><NumberInput value={m.powerFactor} onChange={(v) => setM({ ...m, powerFactor: v })} min={0.5} max={3} step={0.05} suffix="×" /></Field>
             {m.tech === 'fdm' && (
               <>
-                <Field label="Maks. hacimsel akış" hint="Dilimleyici filament profili (0.4 nozul); PLA 15–21, PETG 8–12, TPU 3.6"><NumberInput value={m.maxFlow} onChange={(v) => setM({ ...m, maxFlow: v })} min={0.5} max={60} step={0.5} suffix="mm³/s" /></Field>
-                <Field label="Min. katman süresi" hint="Soğutma için; PLA 4–6 s, PETG/ABS 12 s"><NumberInput value={m.minLayerTime} onChange={(v) => setM({ ...m, minLayerTime: v })} min={0} max={60} step={1} suffix="sn" /></Field>
+                <Field label={t('materialEditor.maxFlow')} hint={t('materialEditor.maxFlowHint')}><NumberInput value={m.maxFlow} onChange={(v) => setM({ ...m, maxFlow: v })} min={0.5} max={60} step={0.5} suffix="mm³/s" /></Field>
+                <Field label={t('materialEditor.minLayerTime')} hint={t('materialEditor.minLayerTimeHint')}><NumberInput value={m.minLayerTime} onChange={(v) => setM({ ...m, minLayerTime: v })} min={0} max={60} step={1} suffix="sn" /></Field>
               </>
             )}
           </div>
-          <Field label="Not (isteğe bağlı)">{input(m.notes ?? '', (v) => setM({ ...m, notes: v }))}</Field>
+          <Field label={t('materialEditor.note')}>{input(m.notes ?? '', (v) => setM({ ...m, notes: v }))}</Field>
         </div>
       </div>
     </div>

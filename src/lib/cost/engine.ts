@@ -1,7 +1,7 @@
 import type { MeshStats } from '../mesh/types.ts'
 import type {
   BusinessSettings, CostLine, Estimate, EstimateTotals, FdmPrinterSpec, FdmPrintParams, Material,
-  PrinterProfile, ResinPrinterSpec, ResinPrintParams, Tech,
+  PrinterProfile, ResinPrinterSpec, ResinPrintParams, Tech, Translate,
 } from './types.ts'
 
 const MM3_PER_CM3 = 1000
@@ -84,8 +84,9 @@ interface CommonInput {
 
 /* ------------------------------------------------------------------ FDM */
 
-export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Estimate {
+export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: Translate): Estimate {
   const { stats, printer, material, settings, params } = input
+  const qp = (n: number) => (n > 1 ? t('cost.detail.qtyPrefix', { qty: n }) : '')
   const spec = printer.spec as FdmPrinterSpec
   const warnings: string[] = []
   const L = stats.layers
@@ -175,17 +176,18 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
   // --- Maliyet (sipariş toplamı) ---
   const price = material.pricePerKgTRY / 1000
   const lines: CostLine[] = []
-  lines.push({ key: 'material', label: 'Model malzemesi', amount: partGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partGrams.toFixed(1)} g ${material.name}` })
-  if (partSupportGrams > 0) lines.push({ key: 'support', label: 'Destek malzemesi', amount: partSupportGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partSupportGrams.toFixed(1)} g` })
-  lines.push({ key: 'waste', label: 'İsraf (purge/flush)', amount: totalWaste * price, detail: `${totalWaste.toFixed(1)} g · ${plates} tabla${colorChangesPlate ? ` · ${colorChangesPlate} AMS flush/tabla` : ''}${nozzleSwitches ? ` · ${nozzleSwitches} nozul değişimi/tabla` : ''}` })
-  lines.push({ key: 'energy', label: 'Elektrik', amount: totalEnergy * settings.electricityTRYPerKWh, detail: `${totalEnergy.toFixed(2)} kWh` })
+  lines.push({ key: 'material', label: t('cost.lines.material_fdm'), amount: partGrams * qty * price, detail: t('cost.detail.materialFdm', { qp: qp(qty), g: partGrams.toFixed(1), mat: material.name }) })
+  if (partSupportGrams > 0) lines.push({ key: 'support', label: t('cost.lines.support_fdm'), amount: partSupportGrams * qty * price, detail: t('cost.detail.support', { qp: qp(qty), g: partSupportGrams.toFixed(1) }) })
+  lines.push({ key: 'waste', label: t('cost.lines.waste_fdm'), amount: totalWaste * price, detail: t('cost.detail.wasteBase', { g: totalWaste.toFixed(1), plates }) + (colorChangesPlate ? t('cost.detail.wasteAms', { n: colorChangesPlate }) : '') + (nozzleSwitches ? t('cost.detail.wasteNozzle', { n: nozzleSwitches }) : '') })
+  lines.push({ key: 'energy', label: t('cost.lines.energy'), amount: totalEnergy * settings.electricityTRYPerKWh, detail: t('cost.detail.energy', { kwh: totalEnergy.toFixed(2) }) })
   const hours = totalTime / 3600
-  lines.push({ key: 'machine', label: 'Makine amortismanı', amount: hours * (printer.priceTRY / printer.lifetimeHours), detail: `${hours.toFixed(2)} sa × ${(printer.priceTRY / printer.lifetimeHours).toFixed(2)} ₺/sa` })
-  lines.push({ key: 'maintenance', label: 'Bakım & sarf', amount: hours * printer.maintenanceTRYPerHour })
+  lines.push({ key: 'machine', label: t('cost.lines.machine'), amount: hours * (printer.priceTRY / printer.lifetimeHours), detail: t('cost.detail.machineFdm', { h: hours.toFixed(2), rate: (printer.priceTRY / printer.lifetimeHours).toFixed(2) }) })
+  lines.push({ key: 'maintenance', label: t('cost.lines.maintenance_fdm'), amount: hours * printer.maintenanceTRYPerHour })
   const laborMin = plates * settings.fdmSetupMinutes + qty * settings.fdmPerPartMinutes
-  lines.push({ key: 'labor', label: 'İşçilik', amount: (laborMin / 60) * settings.laborTRYPerHour, detail: `${plates} tabla × ${settings.fdmSetupMinutes} dk + ${qty} × ${settings.fdmPerPartMinutes} dk` })
+  lines.push({ key: 'labor', label: t('cost.lines.labor_fdm'), amount: (laborMin / 60) * settings.laborTRYPerHour, detail: t('cost.detail.laborFdm', { plates, min: settings.fdmSetupMinutes, qty, min2: settings.fdmPerPartMinutes }) })
 
   return finalize({
+    t,
     tech: 'fdm', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + plateWasteGrams },
     plateTimeSec: fullPlateTime,
@@ -197,8 +199,9 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
 
 /* ---------------------------------------------------------------- Resin */
 
-export function estimateResin(input: CommonInput & { params: ResinPrintParams }): Estimate {
+export function estimateResin(input: CommonInput & { params: ResinPrintParams }, t: Translate): Estimate {
   const { stats, printer, material, settings, params } = input
+  const qp = (n: number) => (n > 1 ? t('cost.detail.qtyPrefix', { qty: n }) : '')
   const spec = printer.spec as ResinPrinterSpec
   const warnings: string[] = []
   const qty = Math.max(1, Math.floor(settings.quantity))
@@ -255,23 +258,24 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams })
   // --- Maliyet (sipariş toplamı) ---
   const price = material.pricePerKgTRY / 1000
   const lines: CostLine[] = []
-  lines.push({ key: 'material', label: 'Model reçinesi', amount: partGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partGrams.toFixed(1)} g ${material.name}${hollowSaved > 0 ? ` (boşaltma ile ${gramsFromMm3(hollowSaved, material.density).toFixed(0)} g/adet tasarruf)` : ''}` })
-  if (partSupportGrams > 0) lines.push({ key: 'support', label: 'Destek reçinesi', amount: partSupportGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partSupportGrams.toFixed(1)} g` })
-  lines.push({ key: 'waste', label: 'İsraf (yıkama kaybı)', amount: partWasteGrams * qty * price, detail: `${(partWasteGrams * qty).toFixed(1)} g` })
+  lines.push({ key: 'material', label: t('cost.lines.material_resin'), amount: partGrams * qty * price, detail: t('cost.detail.materialResin', { qp: qp(qty), g: partGrams.toFixed(1), mat: material.name, hollow: hollowSaved > 0 ? t('cost.detail.materialResinHollow', { n: gramsFromMm3(hollowSaved, material.density).toFixed(0) }) : '' }) })
+  if (partSupportGrams > 0) lines.push({ key: 'support', label: t('cost.lines.support_resin'), amount: partSupportGrams * qty * price, detail: t('cost.detail.support', { qp: qp(qty), g: partSupportGrams.toFixed(1) }) })
+  lines.push({ key: 'waste', label: t('cost.lines.waste_resin'), amount: partWasteGrams * qty * price, detail: t('cost.detail.wasteResin', { g: (partWasteGrams * qty).toFixed(1) }) })
   const ipaLiters = qty * (settings.ipaLitersPerPrintBase + (stats.surfaceArea / 100000) * 0.05)
-  lines.push({ key: 'ipa', label: 'IPA / yıkama', amount: ipaLiters * settings.ipaTRYPerLiter, detail: `${(ipaLiters * 1000).toFixed(0)} ml` })
-  lines.push({ key: 'energy', label: 'Elektrik', amount: totalEnergy * settings.electricityTRYPerKWh, detail: `${totalEnergy.toFixed(2)} kWh` })
+  lines.push({ key: 'ipa', label: t('cost.lines.ipa'), amount: ipaLiters * settings.ipaTRYPerLiter, detail: t('cost.detail.ipa', { ml: (ipaLiters * 1000).toFixed(0) }) })
+  lines.push({ key: 'energy', label: t('cost.lines.energy'), amount: totalEnergy * settings.electricityTRYPerKWh, detail: t('cost.detail.energy', { kwh: totalEnergy.toFixed(2) }) })
   const hours = totalTime / 3600
-  lines.push({ key: 'machine', label: 'Makine amortismanı', amount: hours * (printer.priceTRY / printer.lifetimeHours), detail: `${hours.toFixed(2)} sa · ${plates} tabla` })
-  lines.push({ key: 'maintenance', label: 'Bakım & sarf (FEP, LCD, eldiven, filtre)', amount: hours * printer.maintenanceTRYPerHour })
+  lines.push({ key: 'machine', label: t('cost.lines.machine'), amount: hours * (printer.priceTRY / printer.lifetimeHours), detail: t('cost.detail.machineResin', { h: hours.toFixed(2), plates }) })
+  lines.push({ key: 'maintenance', label: t('cost.lines.maintenance_resin'), amount: hours * printer.maintenanceTRYPerHour })
   const laborMin = plates * (settings.resinSetupMinutes + settings.resinPostMinutes) + qty * settings.resinPerPartMinutes
-  lines.push({ key: 'labor', label: 'İşçilik (hazırlık + yıkama/kürleme + destek sökme)', amount: (laborMin / 60) * settings.laborTRYPerHour, detail: `${plates} tabla × ${settings.resinSetupMinutes + settings.resinPostMinutes} dk + ${qty} × ${settings.resinPerPartMinutes} dk` })
+  lines.push({ key: 'labor', label: t('cost.lines.labor_resin'), amount: (laborMin / 60) * settings.laborTRYPerHour, detail: t('cost.detail.laborResin', { plates, min: settings.resinSetupMinutes + settings.resinPostMinutes, qty, min2: settings.resinPerPartMinutes }) })
 
   if (stats.layers.maxArea > 0.5 * plateArea) {
-    warnings.push('Çok büyük kesit alanı: FEP üzerindeki ayrılma kuvveti yüksek; boşaltma veya açılı yerleşim önerilir.')
+    warnings.push(t('cost.warn.bigArea'))
   }
 
   return finalize({
+    t,
     tech: 'resin', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + partWasteGrams },
     plateTimeSec: fullPlateTime,
@@ -284,20 +288,21 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams })
 /* ------------------------------------------------------------- ortak son */
 
 function finalize(a: {
+  t: Translate
   tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings
   lines: CostLine[]; warnings: string[]; qty: number; partsPerPlate: number; plates: number
   single: { printTimeSec: number; materialGrams: number }; plateTimeSec: number
   totals: Omit<EstimateTotals, 'cost' | 'price' | 'priceWithVat'>
   materialVolumeMm3: number; layerCount: number; breakdown: Record<string, number>
 }): Estimate {
-  const { settings, stats, printer, qty } = a
+  const { t, settings, stats, printer, qty } = a
   const lines = [...a.lines]
   const direct = lines.reduce((s, l) => s + l.amount, 0)
   const fr = a.tech === 'resin' ? settings.resinFailureRate : settings.failureRate
   if (fr > 0) {
-    lines.push({ key: 'failure', label: 'Başarısız baskı riski', amount: direct * (fr / (1 - fr)), detail: `%${(fr * 100).toFixed(0)}` })
+    lines.push({ key: 'failure', label: t('cost.lines.failure'), amount: direct * (fr / (1 - fr)), detail: t('cost.detail.failure', { pct: (fr * 100).toFixed(0) }) })
   }
-  if (settings.packagingTRY > 0) lines.push({ key: 'packaging', label: 'Ambalaj', amount: settings.packagingTRY * qty, detail: qty > 1 ? `${qty} × ${settings.packagingTRY} ₺` : undefined })
+  if (settings.packagingTRY > 0) lines.push({ key: 'packaging', label: t('cost.lines.packaging'), amount: settings.packagingTRY * qty, detail: qty > 1 ? t('cost.detail.packaging', { qty, try: settings.packagingTRY }) : undefined })
   const cost = lines.reduce((s, l) => s + l.amount, 0)
   let price = cost * (1 + settings.markup)
   if (price < settings.minimumPriceTRY) price = settings.minimumPriceTRY
@@ -305,12 +310,12 @@ function finalize(a: {
 
   const fit = checkFit(stats, printer)
   const warnings = [...a.warnings]
-  if (!fit.fits && fit.fitsRotated) warnings.push('Model tablaya yalnızca 90° döndürülünce sığıyor.')
-  if (fit.fitsRotated && qty > a.partsPerPlate) warnings.push(`${qty} adet tek tablaya sığmıyor: tabla başına ${a.partsPerPlate} parça, toplam ${a.plates} tabla (iş) gerekir. 3B görünümde ilk tabla gösteriliyor.`)
-  if (!fit.fitsRotated) warnings.push(`Model bu yazıcının tablasına sığmıyor (${stats.size.x.toFixed(0)}×${stats.size.y.toFixed(0)}×${stats.size.z.toFixed(0)} mm > ${printer.bed.x}×${printer.bed.y}×${printer.bed.z} mm).`)
-  if (stats.manifold.checked && !stats.manifold.isClosed) warnings.push(`Mesh kapalı değil (${stats.manifold.openEdges} açık, ${stats.manifold.nonManifoldEdges} non-manifold kenar); hacim tahmini sapabilir. Dilimleyicide onarım önerilir.`)
-  if (stats.invertedWinding) warnings.push('Yüzey normalleri ters görünüyor; hacim mutlak değer olarak alındı.')
-  if (stats.layers.coarsened) warnings.push('Çok yoğun mesh: katman analizi daha kaba adımla yapıldı.')
+  if (!fit.fits && fit.fitsRotated) warnings.push(t('cost.warn.rotatedFit'))
+  if (fit.fitsRotated && qty > a.partsPerPlate) warnings.push(t('cost.warn.multiPlate', { qty, n: a.partsPerPlate, p: a.plates }))
+  if (!fit.fitsRotated) warnings.push(t('cost.warn.noFit', { x: stats.size.x.toFixed(0), y: stats.size.y.toFixed(0), z: stats.size.z.toFixed(0), bx: printer.bed.x, by: printer.bed.y, bz: printer.bed.z }))
+  if (stats.manifold.checked && !stats.manifold.isClosed) warnings.push(t('cost.warn.notClosed', { o: stats.manifold.openEdges, nm: stats.manifold.nonManifoldEdges }))
+  if (stats.invertedWinding) warnings.push(t('cost.warn.inverted'))
+  if (stats.layers.coarsened) warnings.push(t('cost.warn.coarsened'))
 
   const total: EstimateTotals = { ...a.totals, cost, price, priceWithVat }
   const perUnit: EstimateTotals = {
@@ -326,12 +331,12 @@ function finalize(a: {
   }
 }
 
-export function formatDuration(sec: number): string {
+export function formatDuration(sec: number, t: Translate): string {
   const h = Math.floor(sec / 3600)
   const m = Math.round((sec % 3600) / 60)
-  if (h === 0) return `${m} dk`
-  if (h >= 48) return `${(sec / 86400).toFixed(1)} gün`
-  return `${h} sa ${m} dk`
+  if (h === 0) return t('duration.min', { m })
+  if (h >= 48) return t('duration.day', { n: (sec / 86400).toFixed(1) })
+  return t('duration.hm', { h, m })
 }
 
 export const fmtTRY = (n: number) =>

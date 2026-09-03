@@ -1,43 +1,53 @@
 import type { FdmPrintParams, PrinterProfile, ResinPrintParams } from '../lib/cost/types.ts'
 import { FDM_PRESETS } from '../data/defaults.ts'
 import { Field, NumberInput, Select, Toggle } from './ui.tsx'
+import { useI18n } from '../lib/i18n/index.tsx'
 
 export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrintParams; onChange: (p: FdmPrintParams) => void; printer: PrinterProfile }) {
+  const { t } = useI18n()
   const set = <K extends keyof FdmPrintParams>(k: K, v: FdmPrintParams[K]) => onChange({ ...params, [k]: v })
   const multi = printer.spec.tech === 'fdm' && printer.spec.supportsMultiColor
+  // Seçili ön ayarı, mevcut parametrelerden türet: bir preset'in tüm alanları eşleşiyorsa o seçili görünür,
+  // kullanıcı elle bir değer değiştirdiğinde otomatik olarak "Özel"e döner.
+  const presetKey = Object.entries(FDM_PRESETS).find(([, v]) =>
+    v.layerHeight === params.layerHeight &&
+    v.infillDensity === params.infillDensity &&
+    v.wallLoops === params.wallLoops &&
+    v.topBottomLayers === params.topBottomLayers,
+  )?.[0] ?? ''
   return (
     <div className="space-y-3">
-      <Field label="Kalite ön ayarı">
+      <Field label={t('params.qualityPreset')}>
         <Select
-          value=""
+          value={presetKey}
           onChange={(k) => { if (k) { const { label: _l, ...rest } = FDM_PRESETS[k]; onChange({ ...params, ...rest }) } }}
-          options={[{ value: '', label: 'Seçin…' }, ...Object.entries(FDM_PRESETS).map(([k, v]) => ({ value: k, label: v.label }))]}
+          options={[{ value: '', label: t('params.custom') }, ...Object.entries(FDM_PRESETS).map(([k]) => ({ value: k, label: t('params.presets.' + k) }))]}
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Katman kalınlığı"><NumberInput value={params.layerHeight} onChange={(v) => set('layerHeight', v)} min={0.05} max={0.35} step={0.02} suffix="mm" /></Field>
-        <Field label="Hat genişliği"><NumberInput value={params.lineWidth} onChange={(v) => set('lineWidth', v)} min={0.2} max={1} step={0.02} suffix="mm" /></Field>
-        <Field label="Duvar sayısı"><NumberInput value={params.wallLoops} onChange={(v) => set('wallLoops', Math.round(v))} min={1} max={10} step={1} /></Field>
-        <Field label="Üst/alt katman"><NumberInput value={params.topBottomLayers} onChange={(v) => set('topBottomLayers', Math.round(v))} min={0} max={20} step={1} /></Field>
-        <Field label="Dolgu yoğunluğu"><NumberInput value={Math.round(params.infillDensity * 100)} onChange={(v) => set('infillDensity', v / 100)} min={0} max={100} step={5} suffix="%" /></Field>
-        <Field label="Destek">
-          <Select value={params.supports} onChange={(v) => set('supports', v)} options={[{ value: 'auto', label: 'Otomatik (sarkma varsa)' }, { value: 'on', label: 'Açık' }, { value: 'off', label: 'Kapalı' }]} />
+        <Field label={t('params.layerHeight')}><NumberInput value={params.layerHeight} onChange={(v) => set('layerHeight', v)} min={0.05} max={0.35} step={0.02} suffix="mm" /></Field>
+        <Field label={t('params.lineWidth')}><NumberInput value={params.lineWidth} onChange={(v) => set('lineWidth', v)} min={0.2} max={1} step={0.02} suffix="mm" /></Field>
+        <Field label={t('params.wallLoops')}><NumberInput value={params.wallLoops} onChange={(v) => set('wallLoops', Math.round(v))} min={1} max={10} step={1} /></Field>
+        <Field label={t('params.topBottom')}><NumberInput value={params.topBottomLayers} onChange={(v) => set('topBottomLayers', Math.round(v))} min={0} max={20} step={1} /></Field>
+        <Field label={t('params.infill')}><NumberInput value={Math.round(params.infillDensity * 100)} onChange={(v) => set('infillDensity', v / 100)} min={0} max={100} step={5} suffix="%" /></Field>
+        <Field label={t('params.support')}>
+          <Select value={params.supports} onChange={(v) => set('supports', v)} options={[{ value: 'auto', label: t('params.supportAuto') }, { value: 'on', label: t('params.on') }, { value: 'off', label: t('params.off') }]} />
         </Field>
-        <Field label="Sarkma eşiği"><NumberInput value={params.overhangThresholdDeg} onChange={(v) => set('overhangThresholdDeg', v)} min={10} max={80} step={5} suffix="°" /></Field>
-        <Field label="Destek yoğunluğu" hint="Ağaç ≈ %15, ızgara ≈ %20"><NumberInput value={Math.round(params.supportDensity * 100)} onChange={(v) => set('supportDensity', v / 100)} min={5} max={60} step={5} suffix="%" /></Field>
+        <Field label={t('params.overhangThreshold')}><NumberInput value={params.overhangThresholdDeg} onChange={(v) => set('overhangThresholdDeg', v)} min={10} max={80} step={5} suffix="°" /></Field>
+        <Field label={t('params.supportDensity')} hint={t('params.supportDensityHint')}><NumberInput value={Math.round(params.supportDensity * 100)} onChange={(v) => set('supportDensity', v / 100)} min={5} max={60} step={5} suffix="%" /></Field>
       </div>
       {multi && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
-          <div className="mb-2 text-xs font-medium text-zinc-300">Çok renkli baskı (AMS)</div>
+          <div className="mb-2 text-xs font-medium text-zinc-300">{t('params.multiColor')}</div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Renk sayısı"><NumberInput value={params.colorCount} onChange={(v) => set('colorCount', Math.max(1, Math.round(v)))} min={1} max={16} step={1} /></Field>
-            <Field label="Katman başına değişim" hint="Her katmanda tüm renkler varsa 1"><NumberInput value={params.colorChangesPerLayer} onChange={(v) => set('colorChangesPerLayer', v)} min={0} max={4} step={0.1} /></Field>
+            <Field label={t('params.colorCount')}><NumberInput value={params.colorCount} onChange={(v) => set('colorCount', Math.max(1, Math.round(v)))} min={1} max={16} step={1} /></Field>
+            <Field label={t('params.changesPerLayer')} hint={t('params.changesPerLayerHint')}><NumberInput value={params.colorChangesPerLayer} onChange={(v) => set('colorChangesPerLayer', v)} min={0} max={4} step={0.1} /></Field>
           </div>
           {params.colorCount > 1 && (
             <p className="mt-2 text-[11px] leading-snug text-zinc-500">
               {printer.spec.tech === 'fdm' && printer.spec.dualNozzle
-                ? 'Çift nozul: 2 renk flush\'sız basılır (yalnızca prime tower ve nozul değişimi); 3+ renkte kalan geçişler AMS purge israfı ekler.'
-                : 'Tek nozul + AMS: her renk değişiminde flush israfı ve ~1 dk süre eklenir; küçük çok renkli parçalarda israf malzemenin yarısını aşabilir. Renkler yalnızca bazı katmanlarda değişiyorsa "katman başına değişim" değerini düşürün.'}
+                ? t('params.dualNozzleNote')
+                : t('params.singleNozzleNote')}
             </p>
           )}
         </div>
@@ -47,27 +57,28 @@ export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrint
 }
 
 export function ResinParamsPanel({ params, onChange }: { params: ResinPrintParams; onChange: (p: ResinPrintParams) => void }) {
+  const { t } = useI18n()
   const set = <K extends keyof ResinPrintParams>(k: K, v: ResinPrintParams[K]) => onChange({ ...params, [k]: v })
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Katman kalınlığı"><NumberInput value={params.layerHeight} onChange={(v) => set('layerHeight', v)} min={0.01} max={0.2} step={0.01} suffix="mm" /></Field>
-        <Field label="Pozlama"><NumberInput value={params.exposureSec} onChange={(v) => set('exposureSec', v)} min={0.5} max={30} step={0.1} suffix="sn" /></Field>
-        <Field label="Taban pozlama"><NumberInput value={params.bottomExposureSec} onChange={(v) => set('bottomExposureSec', v)} min={1} max={120} step={1} suffix="sn" /></Field>
-        <Field label="Taban katman"><NumberInput value={params.bottomLayers} onChange={(v) => set('bottomLayers', Math.round(v))} min={1} max={20} step={1} /></Field>
-        <Field label="Kaldırma döngüsü" hint="Kaldır + in + bekle (pozlama hariç)"><NumberInput value={params.liftCycleSec} onChange={(v) => set('liftCycleSec', v)} min={1} max={30} step={0.5} suffix="sn" /></Field>
-        <Field label="Destek">
-          <Select value={params.supports} onChange={(v) => set('supports', v)} options={[{ value: 'auto', label: 'Otomatik' }, { value: 'on', label: 'Açık' }, { value: 'off', label: 'Kapalı' }]} />
+        <Field label={t('params.layerHeight')}><NumberInput value={params.layerHeight} onChange={(v) => set('layerHeight', v)} min={0.01} max={0.2} step={0.01} suffix="mm" /></Field>
+        <Field label={t('params.exposure')}><NumberInput value={params.exposureSec} onChange={(v) => set('exposureSec', v)} min={0.5} max={30} step={0.1} suffix="sn" /></Field>
+        <Field label={t('params.bottomExposure')}><NumberInput value={params.bottomExposureSec} onChange={(v) => set('bottomExposureSec', v)} min={1} max={120} step={1} suffix="sn" /></Field>
+        <Field label={t('params.bottomLayers')}><NumberInput value={params.bottomLayers} onChange={(v) => set('bottomLayers', Math.round(v))} min={1} max={20} step={1} /></Field>
+        <Field label={t('params.liftCycle')} hint={t('params.liftCycleHint')}><NumberInput value={params.liftCycleSec} onChange={(v) => set('liftCycleSec', v)} min={1} max={30} step={0.5} suffix="sn" /></Field>
+        <Field label={t('params.support')}>
+          <Select value={params.supports} onChange={(v) => set('supports', v)} options={[{ value: 'auto', label: t('params.supportAutoResin') }, { value: 'on', label: t('params.on') }, { value: 'off', label: t('params.off') }]} />
         </Field>
-        <Field label="Destek reçine oranı" hint="Tipik %10–30"><NumberInput value={Math.round(params.supportRatio * 100)} onChange={(v) => set('supportRatio', v / 100)} min={0} max={60} step={5} suffix="%" /></Field>
-        <Field label="Sarkma eşiği"><NumberInput value={params.overhangThresholdDeg} onChange={(v) => set('overhangThresholdDeg', v)} min={10} max={80} step={5} suffix="°" /></Field>
+        <Field label={t('params.supportResinRatio')} hint={t('params.supportResinRatioHint')}><NumberInput value={Math.round(params.supportRatio * 100)} onChange={(v) => set('supportRatio', v / 100)} min={0} max={60} step={5} suffix="%" /></Field>
+        <Field label={t('params.overhangThreshold')}><NumberInput value={params.overhangThresholdDeg} onChange={(v) => set('overhangThresholdDeg', v)} min={10} max={80} step={5} suffix="°" /></Field>
       </div>
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
-        <Toggle checked={params.hollow} onChange={(v) => set('hollow', v)} label="Modeli boşalt (hollow)" />
+        <Toggle checked={params.hollow} onChange={(v) => set('hollow', v)} label={t('params.hollow')} />
         {params.hollow && (
           <div className="mt-2 grid grid-cols-2 gap-3">
-            <Field label="Duvar kalınlığı"><NumberInput value={params.hollowWallMm} onChange={(v) => set('hollowWallMm', v)} min={1} max={6} step={0.5} suffix="mm" /></Field>
-            <Field label="İçeride kalan reçine"><NumberInput value={Math.round(params.hollowResidualRatio * 100)} onChange={(v) => set('hollowResidualRatio', v / 100)} min={0} max={50} step={5} suffix="%" /></Field>
+            <Field label={t('params.hollowWall')}><NumberInput value={params.hollowWallMm} onChange={(v) => set('hollowWallMm', v)} min={1} max={6} step={0.5} suffix="mm" /></Field>
+            <Field label={t('params.hollowResidual')}><NumberInput value={Math.round(params.hollowResidualRatio * 100)} onChange={(v) => set('hollowResidualRatio', v / 100)} min={0} max={50} step={5} suffix="%" /></Field>
           </div>
         )}
       </div>

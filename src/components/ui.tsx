@@ -41,13 +41,15 @@ export function NumberInput({ value, onChange, min, max, step, suffix, className
   )
 }
 
-export function Select<T extends string>({ value, onChange, options, className = '' }: {
-  value: T; onChange: (v: T) => void; options: { value: T; label: string; disabled?: boolean }[]; className?: string
+export function Select<T extends string>({ value, onChange, options, className = '', ariaLabel, title }: {
+  value: T; onChange: (v: T) => void; options: { value: T; label: string; disabled?: boolean }[]; className?: string; ariaLabel?: string; title?: string
 }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as T)}
+      aria-label={ariaLabel}
+      title={title}
       className={`w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-sky-500 ${className}`}
     >
       {options.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}

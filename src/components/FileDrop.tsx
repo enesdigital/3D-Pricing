@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { useI18n } from '../lib/i18n/index.tsx'
 
 interface Props {
   onFile: (file: File) => void
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function FileDrop({ onFile, onSample, compact }: Props) {
+  const { t } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
 
@@ -27,16 +29,16 @@ export function FileDrop({ onFile, onSample, compact }: Props) {
     >
       <input ref={inputRef} type="file" accept=".stl,.obj" className="hidden" onChange={(e) => handle(e.target.files)} />
       {compact ? (
-        <p className="text-sm text-zinc-300">Başka bir dosya yüklemek için tıklayın veya sürükleyin</p>
+        <p className="text-sm text-zinc-300">{t('fileDrop.compact')}</p>
       ) : (
         <>
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-800 text-2xl">📦</div>
-          <p className="text-lg font-medium text-zinc-100">STL dosyanızı buraya sürükleyin</p>
-          <p className="mt-1 text-sm text-zinc-400">veya tıklayarak seçin · .stl (binary/ASCII), .obj · en fazla 200 MB</p>
-          <p className="mt-3 text-xs text-zinc-500">Dosyanız tarayıcınızdan dışarı çıkmaz; tüm hesaplama cihazınızda yapılır.</p>
+          <p className="text-lg font-medium text-zinc-100">{t('fileDrop.title')}</p>
+          <p className="mt-1 text-sm text-zinc-400">{t('fileDrop.sub')}</p>
+          <p className="mt-3 text-xs text-zinc-500">{t('fileDrop.privacy')}</p>
           {onSample && (
             <button type="button" onClick={(e) => { e.stopPropagation(); onSample() }} className="mt-4 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-700">
-              Örnek modelle dene (piyon, 71 mm)
+              {t('fileDrop.sample')}
             </button>
           )}
         </>

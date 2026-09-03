@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_PLACEMENT, type MeshStats, type Placement, type WorkerRequest, type WorkerResponse } from './types.ts'
+import type { Translate } from '../cost/types.ts'
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024 // 200 MB üst sınır
 
@@ -33,8 +34,11 @@ export interface AnalyzeParams {
   manifoldCheck: boolean
 }
 
-export function useMeshWorker() {
+export function useMeshWorker(t: Translate) {
   const workerRef = useRef<Worker | null>(null)
+  // t'nin güncel değerini callback'lerde deps churn'ü olmadan kullanmak için ref
+  const tRef = useRef(t)
+  tRef.current = t
   // Yükleme ve analiz istekleri ayrı sayaçlarla izlenir; böylece araya giren bir analiz isteği
   // "yüklendi" cevabının yok sayılmasına yol açmaz.
   const loadId = useRef(0)
@@ -54,7 +58,7 @@ export function useMeshWorker() {
       w = new Worker(new URL('../../workers/mesh.worker.ts', import.meta.url), { type: 'module' })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      queueMicrotask(() => setState((s) => ({ ...s, error: `Web Worker başlatılamadı: ${message}` })))
+      queueMicrotask(() => setState((s) => ({ ...s, error: tRef.current('mesh.workerInitFailed', { message }) })))
       return
     }
     workerRef.current = w
@@ -97,28 +101,28 @@ export function useMeshWorker() {
       }
     }
     w.onerror = (e) => {
-      setState((s) => ({ ...s, busy: 'idle', error: `Worker hatası: ${e.message || 'bilinmeyen (dosya çok büyük olabilir)'}` }))
+      setState((s) => ({ ...s, busy: 'idle', error: tRef.current('mesh.workerError', { message: e.message || tRef.current('mesh.workerErrorUnknown') }) }))
     }
     return () => { w.terminate(); workerRef.current = null }
   }, [])
 
   const send = (msg: WorkerRequest, transfer?: Transferable[]) => {
-    if (!workerRef.current) throw new Error('Worker hazır değil.')
+    if (!workerRef.current) throw new Error(tRef.current('mesh.notReady'))
     workerRef.current.postMessage(msg, transfer ?? [])
   }
 
   const loadFile = useCallback(async (file: File): Promise<boolean> => {
     if (file.size > MAX_FILE_BYTES) {
-      setState((s) => ({ ...s, error: `Dosya çok büyük (${(file.size / 1048576).toFixed(1)} MB). Üst sınır 200 MB.` }))
+      setState((s) => ({ ...s, error: tRef.current('mesh.tooBig', { size: (file.size / 1048576).toFixed(1) }) }))
       return false
     }
     if (file.size === 0) {
-      setState((s) => ({ ...s, error: 'Dosya boş (0 bayt).' }))
+      setState((s) => ({ ...s, error: tRef.current('mesh.empty') }))
       return false
     }
     const ext = file.name.toLowerCase().split('.').pop() ?? ''
     if (!['stl', 'obj'].includes(ext)) {
-      setState((s) => ({ ...s, error: 'Desteklenen biçimler: .stl (binary/ASCII) ve .obj' }))
+      setState((s) => ({ ...s, error: tRef.current('mesh.unsupported') }))
       return false
     }
     const id = ++loadId.current
@@ -138,7 +142,7 @@ export function useMeshWorker() {
       send({ type: 'load', id, buffer, fileName: file.name }, [buffer])
       return true
     } catch (e) {
-      setState((s) => ({ ...s, busy: 'idle', error: `Dosya okunamadı: ${e instanceof Error ? e.message : String(e)}` }))
+      setState((s) => ({ ...s, busy: 'idle', error: tRef.current('mesh.readFailed', { message: e instanceof Error ? e.message : String(e) }) }))
       return false
     }
   }, [])

@@ -3,7 +3,7 @@ import { PRINTERS } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing } from './lib/cost/engine.ts'
-import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams } from './lib/cost/types.ts'
+import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams, Translate } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
 import { shallowMerge, useLocalStorage } from './lib/useLocalStorage.ts'
@@ -20,10 +20,12 @@ import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
 import { downloadQuotePdf, type QuoteImage, type QuotePricing } from './lib/pdf/quote.ts'
 import { imageSize } from './lib/pdf/image.ts'
 import { QuoteDialog } from './components/QuoteDialog.tsx'
+import { useI18n, LANGS } from './lib/i18n/index.tsx'
 
 const LS = 'fdm-sla-calc:v1:'
 
 export default function App() {
+  const { lang, setLang, t } = useI18n()
   // --- Kalıcı ayarlar ---
   const [settings, setSettings, resetSettings] = useLocalStorage<BusinessSettings>(LS + 'settings', DEFAULT_SETTINGS, shallowMerge)
   const [materialPrices, setMaterialPrices, resetMaterialPrices] = useLocalStorage<Record<string, number>>(LS + 'materialPrices', {})
@@ -49,7 +51,7 @@ export default function App() {
   const [modelImage, setModelImage] = useState<QuoteImage | null>(null)
   const [logo, setLogo] = useLocalStorage<QuoteImage | null>(LS + 'quoteLogo', null)
   const captureRef = useRef<(() => string | null) | null>(null)
-  const mesh = useMeshWorker()
+  const mesh = useMeshWorker(t)
 
   // --- Tema (açık / koyu) ---
   // next-themes yerine düz DOM + localStorage: aynı kod hem bu uygulamada hem GitHub sürümünde çalışır.
@@ -133,9 +135,9 @@ export default function App() {
   const estimate = useMemo<Estimate | null>(() => {
     if (!stats || !material) return null
     return printer.tech === 'fdm'
-      ? estimateFdm({ stats, printer, material, settings, params: fdmParams })
-      : estimateResin({ stats, printer, material, settings, params: resinParams })
-  }, [stats, printer, material, settings, fdmParams, resinParams])
+      ? estimateFdm({ stats, printer, material, settings, params: fdmParams }, t)
+      : estimateResin({ stats, printer, material, settings, params: resinParams }, t)
+  }, [stats, printer, material, settings, fdmParams, resinParams, t])
 
   // Tüm yazıcılar için hızlı karşılaştırma
   const comparison = useMemo(() => {
@@ -144,11 +146,11 @@ export default function App() {
       const mats = materials.filter((m) => m.tech === p.tech)
       const m = p.tech === printer.tech && material ? material : mats[0]
       const est = p.tech === 'fdm'
-        ? estimateFdm({ stats, printer: p, material: m, settings, params: fdmParams })
-        : estimateResin({ stats, printer: p, material: m, settings, params: resinParams })
+        ? estimateFdm({ stats, printer: p, material: m, settings, params: fdmParams }, t)
+        : estimateResin({ stats, printer: p, material: m, settings, params: resinParams }, t)
       return { printer: p, material: m, est }
     })
-  }, [stats, printers, materials, printer.tech, material, settings, fdmParams, resinParams])
+  }, [stats, printers, materials, printer.tech, material, settings, fdmParams, resinParams, t])
 
   const fits = stats ? checkFit(stats, printer).fits : true
   const layout = useMemo(() => {
@@ -158,7 +160,7 @@ export default function App() {
   }, [stats, printer, settings.fdmPartSpacingMm, settings.resinPartSpacingMm, settings.plateMarginMm])
   const qty = Math.max(1, Math.floor(settings.quantity))
   const bedForViewer = useMemo(() => ({ x: printer.bed.x, y: printer.bed.y, z: printer.bed.z }), [printer])
-  const busyLabel = mesh.busy === 'reading' ? 'Dosya okunuyor' : mesh.busy === 'parsing' ? 'STL ayrıştırılıyor' : mesh.busy === 'analyzing' ? 'Geometri analiz ediliyor' : ''
+  const busyLabel = mesh.busy === 'reading' ? t('busy.reading') : mesh.busy === 'parsing' ? t('busy.parsing') : mesh.busy === 'analyzing' ? t('busy.analyzing') : ''
 
   const resetAll = () => { resetSettings(); resetMaterialPrices(); resetPrinterOverrides() }
 
@@ -169,8 +171,8 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-base font-bold text-white">3D</div>
             <div>
-              <h1 className="text-sm font-semibold leading-tight">FDM / SLA Baskı Fiyat Hesaplama</h1>
-              <p className="text-[11px] text-zinc-500">STL yükle → yazıcı seç → maliyet ve satış fiyatını gör</p>
+              <h1 className="text-sm font-semibold leading-tight">{t('app.title')}</h1>
+              <p className="text-[11px] text-zinc-500">{t('app.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -180,10 +182,11 @@ export default function App() {
                 {busyLabel} {Math.round(mesh.progress * 100)}%
               </div>
             )}
-            <Button variant="ghost" onClick={toggleTheme} ariaLabel={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'} title={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}>
+            <Select className="w-auto" value={lang} onChange={(v) => setLang(v)} options={LANGS.map((l) => ({ value: l.code, label: l.label }))} ariaLabel={t('header.langAria')} title={t('header.langAria')} />
+            <Button variant="ghost" onClick={toggleTheme} ariaLabel={theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')} title={theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')}>
               <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
             </Button>
-            <Button onClick={() => setSettingsOpen(true)} ariaLabel="Ayarları aç" title="Ayarlar">⚙ Ayarlar</Button>
+            <Button onClick={() => setSettingsOpen(true)} ariaLabel={t('header.settingsAria')} title={t('header.settingsTitle')}>{t('header.settings')}</Button>
           </div>
         </div>
         {mesh.busy !== 'idle' && (
@@ -209,28 +212,28 @@ export default function App() {
           )}
           {mesh.error && <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">{mesh.error}</div>}
 
-          <Card title="Yazıcı ve malzeme">
+          <Card title={t('cards.printerMaterial')}>
             <div className="space-y-3">
-              <Field label="Yazıcı">
-                <Select value={printer.id} onChange={setPrinterId} options={printers.map((p) => ({ value: p.id, label: `${isCustom(p.id) ? '★ ' : ''}${p.brand} ${p.name} · ${p.tech === 'fdm' ? 'FDM' : 'Reçine'} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` }))} />
+              <Field label={t('fields.printer')}>
+                <Select value={printer.id} onChange={setPrinterId} options={printers.map((p) => ({ value: p.id, label: `${isCustom(p.id) ? '★ ' : ''}${p.brand} ${p.name} · ${p.tech === 'fdm' ? t('tech.fdm') : t('tech.resin')} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` }))} />
               </Field>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => setEditor({ open: true, printer: null })}>+ Yazıcı ekle</Button>
-                {isCustom(printer.id) && <Button variant="ghost" onClick={() => setEditor({ open: true, printer })}>Düzenle / Sil</Button>}
+                <Button onClick={() => setEditor({ open: true, printer: null })}>{t('actions.addPrinter')}</Button>
+                {isCustom(printer.id) && <Button variant="ghost" onClick={() => setEditor({ open: true, printer })}>{t('actions.editDelete')}</Button>}
               </div>
               {printer.notes && <p className="text-[11px] leading-snug text-zinc-500">{printer.notes}</p>}
-              <Field label="Malzeme">
+              <Field label={t('fields.material')}>
                 <Select value={material?.id ?? ''} onChange={setMaterialId} options={techMaterials.map((m) => ({ value: m.id, label: `${isCustomMaterial(m.id) ? '★ ' : ''}${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg` }))} />
               </Field>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => setMatEditor({ open: true, material: null })}>+ Malzeme ekle</Button>
-                {material && isCustomMaterial(material.id) && <Button variant="ghost" onClick={() => setMatEditor({ open: true, material })}>Düzenle / Sil</Button>}
+                <Button onClick={() => setMatEditor({ open: true, material: null })}>{t('actions.addMaterial')}</Button>
+                {material && isCustomMaterial(material.id) && <Button variant="ghost" onClick={() => setMatEditor({ open: true, material })}>{t('actions.editDelete')}</Button>}
               </div>
-              <Field label="Adet"><NumberInput value={settings.quantity} onChange={(v) => setSettings({ ...settings, quantity: Math.max(1, Math.round(v)) })} min={1} step={1} /></Field>
+              <Field label={t('fields.quantity')}><NumberInput value={settings.quantity} onChange={(v) => setSettings({ ...settings, quantity: Math.max(1, Math.round(v)) })} min={1} step={1} /></Field>
             </div>
           </Card>
 
-          <Card title={printer.tech === 'fdm' ? 'Baskı ayarları (FDM)' : 'Baskı ayarları (Reçine)'}>
+          <Card title={printer.tech === 'fdm' ? t('cards.fdmSettings') : t('cards.resinSettings')}>
             {printer.tech === 'fdm'
               ? <FdmParamsPanel params={fdmParams} onChange={setFdmParams} printer={printer} />
               : <ResinParamsPanel params={resinParams} onChange={setResinParams} />}
@@ -253,38 +256,38 @@ export default function App() {
               captureRef={captureRef}
             />
             <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-400">
-              {printer.brand} {printer.name} · tabla {printer.bed.x}×{printer.bed.y}×{printer.bed.z} mm
-              {stats && !fits && <span className="ml-2 text-red-300">— model sığmıyor</span>}
+              {printer.brand} {printer.name} · {t('viewer.bed')} {printer.bed.x}×{printer.bed.y}×{printer.bed.z} mm
+              {stats && !fits && <span className="ml-2 text-red-300">{t('viewer.notFit')}</span>}
               {stats && layout && layout.capacity > 0 && qty > 1 && (
                 <span className={`ml-2 ${qty > layout.capacity ? 'text-amber-300' : 'text-emerald-300'}`}>
-                  — {Math.min(qty, layout.capacity)} / {qty} adet gösteriliyor ({layout.cols}×{layout.rows}{layout.rotated ? ', 90° döndürülmüş' : ''})
-                  {qty > layout.capacity && ` · ${Math.ceil(qty / layout.capacity)} tabla gerekir`}
+                  {t('viewer.showing', { shown: Math.min(qty, layout.capacity), qty, cols: layout.cols, rows: layout.rows, rot: layout.rotated ? t('viewer.rotated90') : '' })}
+                  {qty > layout.capacity && t('viewer.platesNeeded', { n: Math.ceil(qty / layout.capacity) })}
                 </span>
               )}
             </div>
             {stats && layout && qty > layout.capacity && layout.capacity > 0 && (
               <div className="pointer-events-none absolute bottom-3 left-3 right-3 rounded-md border border-amber-900/60 bg-amber-950/70 px-3 py-2 text-xs text-amber-200">
-                ⚠ {qty} adet tek tablaya sığmıyor: tabla başına en fazla {layout.capacity} parça ({layout.cols}×{layout.rows}). Sipariş {Math.ceil(qty / layout.capacity)} ayrı baskıda tamamlanır; gösterilen ilk tabladır.
+                {t('viewer.overCapacity', { qty, cap: layout.capacity, cols: layout.cols, rows: layout.rows, plates: Math.ceil(qty / layout.capacity) })}
               </div>
             )}
             {!modelLoaded && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-600">
-                Model yüklendiğinde burada görünecek · sürükle: döndür · tekerlek: yakınlaştır
+                {t('viewer.placeholder')}
               </div>
             )}
           </div>
 
           {comparison.length > 0 && (
-            <Card title="Yazıcı karşılaştırması">
+            <Card title={t('cards.comparison')}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-[11px] uppercase text-zinc-500">
                     <tr>
-                      <th className="py-1 pr-2">Yazıcı</th><th className="py-1 pr-2">Malzeme</th>
-                      <th className="py-1 pr-2 text-right">Gram/adet</th><th className="py-1 pr-2 text-right">{settings.quantity > 1 ? 'Toplam süre' : 'Süre'}</th>
-                      {settings.quantity > 1 && <th className="py-1 pr-2 text-right">Tabla</th>}
-                      <th className="py-1 pr-2 text-right">Fiyat/adet</th>
-                      {settings.quantity > 1 && <th className="py-1 text-right">Toplam ({settings.quantity} adet)</th>}
+                      <th className="py-1 pr-2">{t('compare.printer')}</th><th className="py-1 pr-2">{t('compare.material')}</th>
+                      <th className="py-1 pr-2 text-right">{t('compare.gramPer')}</th><th className="py-1 pr-2 text-right">{settings.quantity > 1 ? t('compare.totalTime') : t('compare.time')}</th>
+                      {settings.quantity > 1 && <th className="py-1 pr-2 text-right">{t('compare.plate')}</th>}
+                      <th className="py-1 pr-2 text-right">{t('compare.pricePer')}</th>
+                      {settings.quantity > 1 && <th className="py-1 text-right">{t('compare.total', { qty: settings.quantity })}</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -292,11 +295,11 @@ export default function App() {
                       <tr key={p.id} className={`border-t border-zinc-800 ${p.id === printer.id ? 'bg-sky-950/30' : ''} ${!est.fitsRotated ? 'opacity-50' : ''}`}>
                         <td className="py-1.5 pr-2 whitespace-nowrap">
                           <button className="text-left hover:text-sky-300" onClick={() => setPrinterId(p.id)}>{p.brand} {p.name}</button>
-                          {!est.fitsRotated && <span className="ml-1 text-[11px] text-red-300">sığmaz</span>}
+                          {!est.fitsRotated && <span className="ml-1 text-[11px] text-red-300">{t('compare.notFit')}</span>}
                         </td>
                         <td className="py-1.5 pr-2 text-xs text-zinc-400">{m.name}</td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.materialGrams.toFixed(0)} g</td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">{fmtDur(est.total.printTimeSec)}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{fmtDur(est.total.printTimeSec, t)}</td>
                         {settings.quantity > 1 && <td className="py-1.5 pr-2 text-right tabular-nums text-xs text-zinc-400">{est.plates} × {est.partsPerPlate}</td>}
                         <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>
                         {settings.quantity > 1 && <td className="py-1.5 text-right font-semibold tabular-nums">{est.total.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>}
@@ -311,15 +314,15 @@ export default function App() {
 
         {/* Sağ: sonuç */}
         <div className="space-y-4">
-          <Card title="Fiyat tahmini" right={estimate && (
+          <Card title={t('cards.priceEstimate')} right={estimate && (
             <div className="flex gap-1">
-              <Button variant="ghost" onClick={() => window.print()} ariaLabel="Fiyat tahminini yazdır" title="Yazdır">🖨 Yazdır</Button>
-              <Button variant="primary" ariaLabel="Teklif PDF'i hazırla" title="Teklif PDF'i" onClick={async () => {
+              <Button variant="ghost" onClick={() => window.print()} ariaLabel={t('actions.printAria')} title={t('actions.printTitle')}>{t('actions.print')}</Button>
+              <Button variant="primary" ariaLabel={t('actions.quotePdfAria')} title={t('actions.quotePdfTitle')} onClick={async () => {
                 setPdfError(null)
                 const url = captureRef.current?.()
                 if (url) { try { const { w, h } = await imageSize(url); setModelImage({ dataUrl: url, w, h }) } catch { setModelImage(null) } } else setModelImage(null)
                 setQuoteOpen(true)
-              }}>📄 Teklif PDF'i</Button>
+              }}>{t('actions.quotePdf')}</Button>
             </div>
           )}>
             {estimate && material ? (
@@ -327,31 +330,28 @@ export default function App() {
             ) : (
               <div className="text-sm text-zinc-500">
                 {mesh.error ? (
-                  <p className="text-red-300">Hesaplama yapılamadı: {mesh.error}</p>
+                  <p className="text-red-300">{t('status.calcFailed', { e: mesh.error })}</p>
                 ) : mesh.model ? (
                   <>
-                    <p>{busyLabel || 'Hesaplanıyor'}… {mesh.busy !== 'idle' && `${Math.round(mesh.progress * 100)}%`}</p>
-                    <p className="mt-1 text-[11px]">Büyük dosyalarda bu adım birkaç saniye sürebilir.</p>
+                    <p>{busyLabel || t('status.calculating')}... {mesh.busy !== 'idle' && `${Math.round(mesh.progress * 100)}%`}</p>
+                    <p className="mt-1 text-[11px]">{t('status.largeFileHint')}</p>
                   </>
-                ) : 'Bir STL dosyası yükleyin.'}
+                ) : t('status.uploadStl')}
               </div>
             )}
           </Card>
-          <Card title="Nasıl hesaplanıyor?">
+          <Card title={t('cards.how')}>
             <ul className="list-disc space-y-1 pl-4 text-[12px] leading-snug text-zinc-400">
-              <li><b>Geometri:</b> STL üçgenlerinden hacim (işaretli tetrahedron toplamı), yüzey alanı, sarkma yüzeyleri ve katman katman kesit/çevre hesaplanır.</li>
-              <li><b>FDM malzeme:</b> duvar (çevre × duvar kalınlığı) + üst/alt kabuk + dolgu (%) + destek sütunları + purge/flush israfı.</li>
-              <li><b>FDM süre:</b> katman bazlı hacim ÷ efektif akış (makine ve malzeme tavanı × geometri karmaşıklığı), min. katman süresi, katman geçişi, ısınma/kalibrasyon ve renk değişimleri.</li>
-              <li><b>Reçine:</b> hacim (+destek, +boşaltma) × yoğunluk; süre = katman × (pozlama + kaldırma döngüsü).</li>
-              <li><b>Maliyet:</b> malzeme + elektrik + amortisman + bakım + işçilik + başarısızlık riski → kâr marjı → KDV.</li>
-              <li>Tahminler dilimleyici yerine geçmez; Ayarlar › Süre kalibrasyonu ile kendi sonuçlarınıza göre ayarlayın.</li>
+              {(['item1', 'item2', 'item3', 'item4', 'item5', 'item6'] as const).map((k) => (
+                <li key={k} dangerouslySetInnerHTML={{ __html: t('how.' + k) }} />
+              ))}
             </ul>
           </Card>
         </div>
       </main>
 
       <footer className="border-t border-zinc-800 px-4 py-3 text-center text-[11px] text-zinc-600">
-        Tüm hesaplamalar tarayıcınızda yapılır; dosyalar sunucuya gönderilmez. Fiyat verileri Eylül 2026 Türkiye perakende referanslıdır.
+        {t('footer.text')}
       </footer>
 
       {estimate && material && quoteOpen && (
@@ -365,7 +365,7 @@ export default function App() {
             if (!stats || !mesh.model) return
             setPdfBusy(true); setPdfError(null)
             try {
-              await downloadQuotePdf({ est: estimate, stats, printer, material, settings, fdmParams, resinParams, placement, fileName: mesh.model.fileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction })
+              await downloadQuotePdf({ est: estimate, stats, printer, material, settings, fdmParams, resinParams, placement, fileName: mesh.model.fileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction }, t)
               setQuoteOpen(false)
             } catch (e) {
               setPdfError(e instanceof Error ? e.message : String(e))
@@ -394,7 +394,7 @@ export default function App() {
   )
 }
 
-function fmtDur(sec: number) {
+function fmtDur(sec: number, t: Translate) {
   const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60)
-  return h ? `${h}s ${m}d` : `${m} dk`
+  return h ? t('duration.compactHM', { h, m }) : t('duration.compactMin', { m })
 }

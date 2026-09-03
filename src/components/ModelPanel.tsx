@@ -1,6 +1,7 @@
 import { effectiveScale, type MeshStats, type Placement } from '../lib/mesh/types.ts'
 import type { LoadedModel } from '../lib/mesh/useMeshWorker.ts'
 import { Button, NumberInput, Toggle } from './ui.tsx'
+import { useI18n } from '../lib/i18n/index.tsx'
 
 interface Props {
   model: LoadedModel
@@ -15,6 +16,7 @@ interface Props {
 const fmt = (n: number, d = 1) => n.toLocaleString('tr-TR', { maximumFractionDigits: d })
 
 export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck, onManifoldCheck, onClear }: Props) {
+  const { t } = useI18n()
   const rot = (axis: 'rotX' | 'rotY' | 'rotZ', d: number) => onPlacement({ ...placement, [axis]: ((placement[axis] + d) % 360 + 360) % 360 })
   const inch = placement.unit === 25.4
   const scale = effectiveScale(placement)
@@ -30,38 +32,38 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate font-medium text-zinc-100" title={model.fileName}>{model.fileName}</div>
-          <div className="text-xs text-zinc-500">{(model.fileSize / 1048576).toFixed(2)} MB · {model.triangleCount.toLocaleString('tr-TR')} üçgen{model.format ? ` · ${model.format}` : ''}</div>
+          <div className="text-xs text-zinc-500">{(model.fileSize / 1048576).toFixed(2)} MB · {t('model.triangles', { n: model.triangleCount.toLocaleString('tr-TR') })}{model.format ? ` · ${model.format}` : ''}</div>
         </div>
-        <Button variant="ghost" onClick={onClear} className="shrink-0">Kaldır</Button>
+        <Button variant="ghost" onClick={onClear} className="shrink-0">{t('model.remove')}</Button>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-zinc-950/60 p-3 text-xs">
-          <span className="text-zinc-500">Boyut (X×Y×Z)</span>
+          <span className="text-zinc-500">{t('model.size')}</span>
           <span className="text-right tabular-nums text-zinc-200">{fmt(stats.size.x)} × {fmt(stats.size.y)} × {fmt(stats.size.z)} mm</span>
-          <span className="text-zinc-500">Hacim</span>
+          <span className="text-zinc-500">{t('model.volume')}</span>
           <span className="text-right tabular-nums text-zinc-200">{fmt(stats.volume / 1000, 2)} cm³</span>
-          <span className="text-zinc-500">Yüzey alanı</span>
+          <span className="text-zinc-500">{t('model.surfaceArea')}</span>
           <span className="text-right tabular-nums text-zinc-200">{fmt(stats.surfaceArea / 100, 1)} cm²</span>
-          <span className="text-zinc-500">Tabla teması</span>
+          <span className="text-zinc-500">{t('model.bedContact')}</span>
           <span className="text-right tabular-nums text-zinc-200">{fmt(stats.bedContactArea / 100, 1)} cm²</span>
-          <span className="text-zinc-500">Sarkma alanı (&gt;{stats.overhangThresholdDeg}°)</span>
+          <span className="text-zinc-500">{t('model.overhangArea', { deg: stats.overhangThresholdDeg })}</span>
           <span className={`text-right tabular-nums ${stats.overhangArea > 4 ? 'text-orange-300' : 'text-zinc-200'}`}>{fmt(stats.overhangArea / 100, 1)} cm²</span>
-          <span className="text-zinc-500">Mesh</span>
+          <span className="text-zinc-500">{t('model.mesh')}</span>
           <span className={`text-right ${stats.manifold.checked ? (stats.manifold.isClosed ? 'text-emerald-300' : 'text-amber-300') : 'text-zinc-500'}`}>
-            {stats.manifold.checked ? (stats.manifold.isClosed ? 'kapalı (manifold)' : `${stats.manifold.openEdges} açık kenar`) : 'kontrol edilmedi'}
+            {stats.manifold.checked ? (stats.manifold.isClosed ? t('model.closed') : t('model.openEdges', { n: stats.manifold.openEdges })) : t('model.notChecked')}
           </span>
         </div>
       )}
 
       <div>
-        <div className="mb-1 text-xs font-medium text-zinc-400">Yerleşim (90° döndür)</div>
+        <div className="mb-1 text-xs font-medium text-zinc-400">{t('model.placement')}</div>
         <div className="grid grid-cols-3 gap-1">
           {(['rotX', 'rotY', 'rotZ'] as const).map((a) => (
             <div key={a} className="flex items-center rounded-md border border-zinc-700 bg-zinc-950">
-              <button type="button" aria-label={`${a.slice(-1).toUpperCase()} eksenini 90° geri döndür`} title={`${a.slice(-1).toUpperCase()} −90°`} className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, -90)}><span aria-hidden="true">−</span></button>
+              <button type="button" aria-label={t('model.rotBack', { axis: a.slice(-1).toUpperCase() })} title={t('model.rotBackTitle', { axis: a.slice(-1).toUpperCase() })} className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, -90)}><span aria-hidden="true">−</span></button>
               <span className="flex-1 text-center text-xs text-zinc-400">{a.slice(-1)} {placement[a]}°</span>
-              <button type="button" aria-label={`${a.slice(-1).toUpperCase()} eksenini 90° ileri döndür`} title={`${a.slice(-1).toUpperCase()} +90°`} className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, 90)}><span aria-hidden="true">+</span></button>
+              <button type="button" aria-label={t('model.rotFwd', { axis: a.slice(-1).toUpperCase() })} title={t('model.rotFwdTitle', { axis: a.slice(-1).toUpperCase() })} className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, 90)}><span aria-hidden="true">+</span></button>
             </div>
           ))}
         </div>
@@ -69,8 +71,8 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-zinc-400">Ölçek</span>
-          {placement.scalePct !== 100 && <button className="text-[11px] text-sky-300 hover:underline" onClick={() => setPct(100)}>%100'e dön</button>}
+          <span className="text-xs font-medium text-zinc-400">{t('model.scale')}</span>
+          {placement.scalePct !== 100 && <button className="text-[11px] text-sky-300 hover:underline" onClick={() => setPct(100)}>{t('model.resetScale')}</button>}
         </div>
         <div className="grid grid-cols-4 gap-1">
           <NumberInput value={Math.round(placement.scalePct * 100) / 100} onChange={setPct} min={0.1} max={10000} step={1} suffix="%" />
@@ -78,14 +80,14 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
             <NumberInput key={a} value={stats ? Math.round(stats.size[a] * 100) / 100 : 0} onChange={(v) => setTarget(a, v)} min={0.01} step={1} suffix={a.toUpperCase()} />
           ))}
         </div>
-        <p className="mt-1 text-[11px] text-zinc-500">Bir eksene hedef mm girin; oran korunarak tüm model ölçeklenir.</p>
+        <p className="mt-1 text-[11px] text-zinc-500">{t('model.scaleHint')}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Toggle checked={inch} onChange={(v) => onPlacement({ ...placement, unit: v ? 25.4 : 1 })} label="Dosya inç birimli" />
-        <Toggle checked={manifoldCheck} onChange={onManifoldCheck} label="Manifold kontrolü" />
+        <Toggle checked={inch} onChange={(v) => onPlacement({ ...placement, unit: v ? 25.4 : 1 })} label={t('model.inchUnit')} />
+        <Toggle checked={manifoldCheck} onChange={onManifoldCheck} label={t('model.manifoldCheck')} />
       </div>
-      <p className="text-[11px] leading-snug text-zinc-500">Renkler: <span className="text-sky-300">mavi</span> normal yüzey, <span className="text-orange-300">turuncu</span> destek gerektiren sarkma, <span className="text-emerald-300">yeşil</span> tabla teması.</p>
+      <p className="text-[11px] leading-snug text-zinc-500">{t('model.colorsPrefix')}<span className="text-sky-300">{t('model.colorBlue')}</span>{t('model.colorBlueDesc')}<span className="text-orange-300">{t('model.colorOrange')}</span>{t('model.colorOrangeDesc')}<span className="text-emerald-300">{t('model.colorGreen')}</span>{t('model.colorGreenDesc')}</p>
     </div>
   )
 }

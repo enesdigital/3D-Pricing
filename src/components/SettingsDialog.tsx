@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { BusinessSettings, Material, PrinterProfile } from '../lib/cost/types.ts'
 import { Button, Field, NumberInput } from './ui.tsx'
+import { useI18n } from '../lib/i18n/index.tsx'
 
 export interface PrinterOverride { priceTRY?: number; lifetimeHours?: number; maintenanceTRYPerHour?: number; avgPowerW?: number }
 
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function SettingsDialog(p: Props) {
+  const { t } = useI18n()
   useEffect(() => {
     if (!p.open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') p.onClose() }
@@ -33,55 +35,55 @@ export function SettingsDialog(p: Props) {
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={p.onClose}>
       <div className="my-6 w-full max-w-3xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
-          <h2 className="text-base font-semibold">Ayarlar</h2>
+          <h2 className="text-base font-semibold">{t('settings.title')}</h2>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={p.onReset}>Varsayılanlara dön</Button>
-            <Button variant="primary" onClick={p.onClose}>Kapat</Button>
+            <Button variant="ghost" onClick={p.onReset}>{t('settings.reset')}</Button>
+            <Button variant="primary" onClick={p.onClose}>{t('settings.close')}</Button>
           </div>
         </header>
         <div className="space-y-6 p-5">
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-zinc-200">İşletme</h3>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('settings.secBusiness')}</h3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <Field label="Elektrik" hint="EPDK 2026: mesken ≈3.2 / kademe 2 ≈4.7–5.9 / ticarethane ≈6.5 ₺"><NumberInput value={s.electricityTRYPerKWh} onChange={(v) => set('electricityTRYPerKWh', v)} min={0} step={0.1} suffix="₺/kWh" /></Field>
-              <Field label="İşçilik ücreti"><NumberInput value={s.laborTRYPerHour} onChange={(v) => set('laborTRYPerHour', v)} min={0} step={10} suffix="₺/sa" /></Field>
-              <Field label="Kâr marjı"><NumberInput value={Math.round(s.markup * 100)} onChange={(v) => set('markup', v / 100)} min={0} max={500} step={5} suffix="%" /></Field>
-              <Field label="KDV"><NumberInput value={Math.round(s.vat * 100)} onChange={(v) => set('vat', v / 100)} min={0} max={50} step={1} suffix="%" /></Field>
-              <Field label="Başarısız baskı oranı (FDM)" hint="Print farm %2–5, prosumer %8–10"><NumberInput value={Math.round(s.failureRate * 100)} onChange={(v) => set('failureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
-              <Field label="Başarısız baskı oranı (reçine)" hint="Tipik %10–20"><NumberInput value={Math.round(s.resinFailureRate * 100)} onChange={(v) => set('resinFailureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
-              <Field label="Minimum sipariş"><NumberInput value={s.minimumPriceTRY} onChange={(v) => set('minimumPriceTRY', v)} min={0} step={10} suffix="₺" /></Field>
-              <Field label="Ambalaj (adet)"><NumberInput value={s.packagingTRY} onChange={(v) => set('packagingTRY', v)} min={0} step={5} suffix="₺" /></Field>
-              <Field label="FDM hazırlık işçiliği" hint="Tabla başına"><NumberInput value={s.fdmSetupMinutes} onChange={(v) => set('fdmSetupMinutes', v)} min={0} step={1} suffix="dk" /></Field>
-              <Field label="Reçine hazırlık" hint="Tabla başına"><NumberInput value={s.resinSetupMinutes} onChange={(v) => set('resinSetupMinutes', v)} min={0} step={1} suffix="dk" /></Field>
-              <Field label="Reçine yıkama/kürleme" hint="Tabla/parti başına (toplu işlem)"><NumberInput value={s.resinPostMinutes} onChange={(v) => set('resinPostMinutes', v)} min={0} step={1} suffix="dk" /></Field>
-              <Field label="IPA fiyatı"><NumberInput value={s.ipaTRYPerLiter} onChange={(v) => set('ipaTRYPerLiter', v)} min={0} step={10} suffix="₺/L" /></Field>
-              <Field label="IPA tüketimi (parça başına)" hint="Yüzey alanına göre artar; 1 L ≈ 30–50 küçük parça"><NumberInput value={Math.round(s.ipaLitersPerPrintBase * 1000)} onChange={(v) => set('ipaLitersPerPrintBase', v / 1000)} min={0} step={5} suffix="ml" /></Field>
-              <Field label="FDM parça başına işçilik" hint="Tabladan alma, temizlik"><NumberInput value={s.fdmPerPartMinutes} onChange={(v) => set('fdmPerPartMinutes', v)} min={0} step={0.5} suffix="dk" /></Field>
-              <Field label="Reçine parça başına işçilik" hint="Destek sökme, kontrol"><NumberInput value={s.resinPerPartMinutes} onChange={(v) => set('resinPerPartMinutes', v)} min={0} step={0.5} suffix="dk" /></Field>
-              <Field label="FDM parça aralığı" hint="Bambu Studio auto-arrange varsayılanı 2 mm"><NumberInput value={s.fdmPartSpacingMm} onChange={(v) => set('fdmPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
-              <Field label="Reçine parça aralığı" hint="Küçük parçalar; >40 cm² tabanlarda otomatik 15 mm"><NumberInput value={s.resinPartSpacingMm} onChange={(v) => set('resinPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
-              <Field label="Tabla kenar payı"><NumberInput value={s.plateMarginMm} onChange={(v) => set('plateMarginMm', v)} min={0} step={1} suffix="mm" /></Field>
-              <Field label="Reçine kaplama cezası" hint="Statik ayırmalı makinelerde tabla doluyken katman süresi artışı (üst sınır %30); tilt-release yazıcılarda uygulanmaz"><NumberInput value={Math.round(s.resinLiftAreaPenalty * 100)} onChange={(v) => set('resinLiftAreaPenalty', v / 100)} min={0} max={200} step={5} suffix="%" /></Field>
-              <Field label="Süre kalibrasyonu" hint="Dilimleyici sonucunuza göre çarpan (Bambu Studio gerçekte %15–20 kısa tahmin eder)"><NumberInput value={s.timeMultiplier} onChange={(v) => set('timeMultiplier', v)} min={0.3} max={3} step={0.05} suffix="×" /></Field>
+              <Field label={t('settings.electricity')} hint={t('settings.electricityHint')}><NumberInput value={s.electricityTRYPerKWh} onChange={(v) => set('electricityTRYPerKWh', v)} min={0} step={0.1} suffix="₺/kWh" /></Field>
+              <Field label={t('settings.labor')}><NumberInput value={s.laborTRYPerHour} onChange={(v) => set('laborTRYPerHour', v)} min={0} step={10} suffix="₺/sa" /></Field>
+              <Field label={t('settings.markup')}><NumberInput value={Math.round(s.markup * 100)} onChange={(v) => set('markup', v / 100)} min={0} max={500} step={5} suffix="%" /></Field>
+              <Field label={t('settings.vat')}><NumberInput value={Math.round(s.vat * 100)} onChange={(v) => set('vat', v / 100)} min={0} max={50} step={1} suffix="%" /></Field>
+              <Field label={t('settings.failureFdm')} hint={t('settings.failureFdmHint')}><NumberInput value={Math.round(s.failureRate * 100)} onChange={(v) => set('failureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
+              <Field label={t('settings.failureResin')} hint={t('settings.failureResinHint')}><NumberInput value={Math.round(s.resinFailureRate * 100)} onChange={(v) => set('resinFailureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
+              <Field label={t('settings.minimum')}><NumberInput value={s.minimumPriceTRY} onChange={(v) => set('minimumPriceTRY', v)} min={0} step={10} suffix="₺" /></Field>
+              <Field label={t('settings.packaging')}><NumberInput value={s.packagingTRY} onChange={(v) => set('packagingTRY', v)} min={0} step={5} suffix="₺" /></Field>
+              <Field label={t('settings.fdmSetup')} hint={t('settings.perPlate')}><NumberInput value={s.fdmSetupMinutes} onChange={(v) => set('fdmSetupMinutes', v)} min={0} step={1} suffix={t('units.min')} /></Field>
+              <Field label={t('settings.resinSetup')} hint={t('settings.perPlate')}><NumberInput value={s.resinSetupMinutes} onChange={(v) => set('resinSetupMinutes', v)} min={0} step={1} suffix={t('units.min')} /></Field>
+              <Field label={t('settings.resinPost')} hint={t('settings.resinPostHint')}><NumberInput value={s.resinPostMinutes} onChange={(v) => set('resinPostMinutes', v)} min={0} step={1} suffix={t('units.min')} /></Field>
+              <Field label={t('settings.ipaPrice')}><NumberInput value={s.ipaTRYPerLiter} onChange={(v) => set('ipaTRYPerLiter', v)} min={0} step={10} suffix="₺/L" /></Field>
+              <Field label={t('settings.ipaConsumption')} hint={t('settings.ipaConsumptionHint')}><NumberInput value={Math.round(s.ipaLitersPerPrintBase * 1000)} onChange={(v) => set('ipaLitersPerPrintBase', v / 1000)} min={0} step={5} suffix="ml" /></Field>
+              <Field label={t('settings.fdmPerPart')} hint={t('settings.fdmPerPartHint')}><NumberInput value={s.fdmPerPartMinutes} onChange={(v) => set('fdmPerPartMinutes', v)} min={0} step={0.5} suffix={t('units.min')} /></Field>
+              <Field label={t('settings.resinPerPart')} hint={t('settings.resinPerPartHint')}><NumberInput value={s.resinPerPartMinutes} onChange={(v) => set('resinPerPartMinutes', v)} min={0} step={0.5} suffix={t('units.min')} /></Field>
+              <Field label={t('settings.fdmSpacing')} hint={t('settings.fdmSpacingHint')}><NumberInput value={s.fdmPartSpacingMm} onChange={(v) => set('fdmPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
+              <Field label={t('settings.resinSpacing')} hint={t('settings.resinSpacingHint')}><NumberInput value={s.resinPartSpacingMm} onChange={(v) => set('resinPartSpacingMm', v)} min={0} step={1} suffix="mm" /></Field>
+              <Field label={t('settings.plateMargin')}><NumberInput value={s.plateMarginMm} onChange={(v) => set('plateMarginMm', v)} min={0} step={1} suffix="mm" /></Field>
+              <Field label={t('settings.resinLiftPenalty')} hint={t('settings.resinLiftPenaltyHint')}><NumberInput value={Math.round(s.resinLiftAreaPenalty * 100)} onChange={(v) => set('resinLiftAreaPenalty', v / 100)} min={0} max={200} step={5} suffix="%" /></Field>
+              <Field label={t('settings.timeCalibration')} hint={t('settings.timeCalibrationHint')}><NumberInput value={s.timeMultiplier} onChange={(v) => set('timeMultiplier', v)} min={0.3} max={3} step={0.05} suffix="×" /></Field>
             </div>
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-zinc-200">Teklif PDF'i</h3>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('settings.secPdf')}</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="Firma / kişi adı" hint="PDF başlığında görünür"><input value={s.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder="Örn. Enes 3D Atölye" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
-              <Field label="İletişim" hint="Telefon, e-posta, adres"><input value={s.companyContact} onChange={(e) => set('companyContact', e.target.value)} placeholder="+90 5xx · ornek@eposta.com" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
-              <Field label="Teklif geçerliliği"><NumberInput value={s.quoteValidityDays} onChange={(v) => set('quoteValidityDays', Math.max(1, Math.round(v)))} min={1} step={1} suffix="gün" /></Field>
-              <div className="md:col-span-2"><Field label="Teklif notu"><textarea value={s.quoteNote} onChange={(e) => set('quoteNote', e.target.value)} rows={2} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field></div>
+              <Field label={t('settings.companyName')} hint={t('settings.companyNameHint')}><input value={s.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder={t('settings.companyNamePlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label={t('settings.contact')} hint={t('settings.contactHint')}><input value={s.companyContact} onChange={(e) => set('companyContact', e.target.value)} placeholder={t('settings.contactPlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label={t('settings.quoteValidity')}><NumberInput value={s.quoteValidityDays} onChange={(v) => set('quoteValidityDays', Math.max(1, Math.round(v)))} min={1} step={1} suffix={t('units.days')} /></Field>
+              <div className="md:col-span-2"><Field label={t('settings.quoteNote')}><textarea value={s.quoteNote} onChange={(e) => set('quoteNote', e.target.value)} rows={2} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field></div>
             </div>
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-zinc-200">Yazıcılar</h3>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('settings.secPrinters')}</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-[11px] uppercase text-zinc-500">
-                  <tr><th className="py-1 pr-2">Yazıcı</th><th className="py-1 pr-2">Fiyat (₺)</th><th className="py-1 pr-2">Ömür (sa)</th><th className="py-1 pr-2">Bakım (₺/sa)</th><th className="py-1">Ort. güç (W)</th></tr>
+                  <tr><th className="py-1 pr-2">{t('settings.thPrinter')}</th><th className="py-1 pr-2">{t('settings.thPrice')}</th><th className="py-1 pr-2">{t('settings.thLifetime')}</th><th className="py-1 pr-2">{t('settings.thMaintenance')}</th><th className="py-1">{t('settings.thPower')}</th></tr>
                 </thead>
                 <tbody>
                   {p.printers.map((pr) => {
@@ -103,7 +105,7 @@ export function SettingsDialog(p: Props) {
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-zinc-200">Malzeme fiyatları (₺/kg, KDV dahil)</h3>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('settings.secMaterials')}</h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {p.materials.map((m) => (
                 <div key={m.id} className="flex items-center justify-between gap-2 rounded-md bg-zinc-950/60 px-3 py-1.5">
