@@ -51,6 +51,27 @@ export default function App() {
   const captureRef = useRef<(() => string | null) | null>(null)
   const mesh = useMeshWorker()
 
+  // --- Tema (açık / koyu) ---
+  // next-themes yerine düz DOM + localStorage: aynı kod hem bu uygulamada hem GitHub sürümünde çalışır.
+  const [theme, setThemeState] = useState<'light' | 'dark'>('dark')
+  useEffect(() => {
+    const stored = (localStorage.getItem(LS + 'theme') as 'light' | 'dark' | null) ?? 'dark'
+    setThemeState(stored)
+    const el = document.documentElement
+    el.classList.remove('light', 'dark')
+    el.classList.add(stored)
+  }, [])
+  const toggleTheme = () => {
+    setThemeState((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark'
+      const el = document.documentElement
+      el.classList.remove('light', 'dark')
+      el.classList.add(next)
+      try { localStorage.setItem(LS + 'theme', next) } catch { /* yoksay */ }
+      return next
+    })
+  }
+
   // Etkin yazıcı / malzeme (override'lar uygulanmış)
   const printers = useMemo<PrinterProfile[]>(() => [
     ...PRINTERS.map((p) => {
@@ -146,7 +167,7 @@ export default function App() {
       <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="flex w-full items-center justify-between gap-4 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-base font-bold">3D</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-base font-bold text-white">3D</div>
             <div>
               <h1 className="text-sm font-semibold leading-tight">FDM / SLA Baskı Fiyat Hesaplama</h1>
               <p className="text-[11px] text-zinc-500">STL yükle → yazıcı seç → maliyet ve satış fiyatını gör</p>
@@ -159,7 +180,10 @@ export default function App() {
                 {busyLabel} {Math.round(mesh.progress * 100)}%
               </div>
             )}
-            <Button onClick={() => setSettingsOpen(true)}>⚙ Ayarlar</Button>
+            <Button variant="ghost" onClick={toggleTheme} ariaLabel={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'} title={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}>
+              <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            </Button>
+            <Button onClick={() => setSettingsOpen(true)} ariaLabel="Ayarları aç" title="Ayarlar">⚙ Ayarlar</Button>
           </div>
         </div>
         {mesh.busy !== 'idle' && (
@@ -167,7 +191,7 @@ export default function App() {
         )}
       </header>
 
-      <main className="grid w-full flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[340px_minmax(0,1fr)_400px] 2xl:grid-cols-[380px_minmax(0,1fr)_460px]">
+      <main className="grid w-full flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[340px_minmax(0,1fr)_400px] 2xl:grid-cols-[380px_minmax(0,1fr)_460px]">
         {/* Sol: model */}
         <div className="space-y-4">
           {!mesh.model ? (
@@ -214,7 +238,7 @@ export default function App() {
         </div>
 
         {/* Orta: 3B görünüm */}
-        <div className="flex min-h-[520px] flex-col gap-4 lg:min-h-[calc(100vh-7rem)]">
+        <div className="flex min-h-[520px] flex-col gap-4 xl:min-h-[calc(100vh-7rem)]">
           <div className="relative flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
             <Viewer3D
               positions={modelLoaded ? mesh.model!.positions : null}
@@ -289,8 +313,8 @@ export default function App() {
         <div className="space-y-4">
           <Card title="Fiyat tahmini" right={estimate && (
             <div className="flex gap-1">
-              <Button variant="ghost" onClick={() => window.print()}>🖨 Yazdır</Button>
-              <Button variant="primary" onClick={async () => {
+              <Button variant="ghost" onClick={() => window.print()} ariaLabel="Fiyat tahminini yazdır" title="Yazdır">🖨 Yazdır</Button>
+              <Button variant="primary" ariaLabel="Teklif PDF'i hazırla" title="Teklif PDF'i" onClick={async () => {
                 setPdfError(null)
                 const url = captureRef.current?.()
                 if (url) { try { const { w, h } = await imageSize(url); setModelImage({ dataUrl: url, w, h }) } catch { setModelImage(null) } } else setModelImage(null)

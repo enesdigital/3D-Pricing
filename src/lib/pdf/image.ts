@@ -18,7 +18,22 @@ export function fileToPngDataUrl(file: File, maxW = 800, maxH = 400): Promise<st
         const ctx = c.getContext('2d')
         if (!ctx) { reject(new Error('Canvas desteklenmiyor.')); return }
         ctx.drawImage(img, 0, 0, w, h)
-        resolve(c.toDataURL('image/png'))
+        const png = c.toDataURL('image/png')
+        // Kalıcı depolama kota koruması: PNG büyükse beyaz zemine yerleştirip JPEG ile küçült.
+        let out = png
+        if (png.length > 512 * 1024) {
+          const c2 = document.createElement('canvas')
+          c2.width = w; c2.height = h
+          const ctx2 = c2.getContext('2d')
+          if (ctx2) {
+            ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0, 0, w, h)
+            ctx2.drawImage(img, 0, 0, w, h)
+            const jpg = c2.toDataURL('image/jpeg', 0.85)
+            if (jpg.length < png.length) out = jpg
+          }
+        }
+        if (out.length > 2 * 1024 * 1024) { reject(new Error('Logo çok büyük; lütfen daha küçük veya sade bir görsel kullanın.')); return }
+        resolve(out)
       }
       img.src = reader.result as string
     }

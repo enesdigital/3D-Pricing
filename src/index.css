@@ -18,3 +18,68 @@ input[type=number]::-webkit-inner-spin-button { opacity: 1; }
   .text-zinc-400, .text-zinc-500 { color: #444 !important; }
   .bg-zinc-950\/60, .bg-zinc-900\/60 { background: #f5f5f5 !important; }
 }
+
+/* =========================================================================
+   Açık mod (light) — bileşenler koyu renkleri sabit sınıflarla kullanıyor.
+   Burada yalnızca html.light altında bu sınıfları açık paletle yeniden
+   eşliyoruz; bileşen dosyaları değişmez → Abacus (Next.js) sürümüyle kod ortak
+   kalır. Bu kurallar katmansız (unlayered) olduğu için Tailwind utility
+   katmanını güvenle geçersiz kılar.
+   ========================================================================= */
+html.light body { background-color: #fafafa; color: #18181b; }
+
+/* Yüzeyler */
+html.light .bg-zinc-950 { background-color: #ffffff; }
+html.light .bg-zinc-950\/90 { background-color: rgba(255, 255, 255, 0.9); }
+html.light .bg-zinc-950\/70 { background-color: rgba(255, 255, 255, 0.85); }
+html.light .bg-zinc-950\/60 { background-color: #f4f4f5; }
+html.light .bg-zinc-950\/50 { background-color: #f4f4f5; }
+html.light .bg-zinc-900 { background-color: #f4f4f5; }
+html.light .bg-zinc-900\/60 { background-color: #ffffff; }
+html.light .bg-zinc-900\/40 { background-color: #fafafa; }
+html.light .bg-zinc-800 { background-color: #e4e4e7; }
+html.light .bg-zinc-700 { background-color: #d4d4d8; }
+
+/* Kenarlıklar */
+html.light .border-zinc-800 { border-color: #e4e4e7; }
+html.light .border-zinc-800\/80 { border-color: #e4e4e7; }
+html.light .border-zinc-700 { border-color: #d4d4d8; }
+html.light .border-zinc-500 { border-color: #a1a1aa; }
+
+/* Metin */
+html.light .text-zinc-100 { color: #18181b; }
+html.light .text-zinc-200 { color: #27272a; }
+html.light .text-zinc-300 { color: #3f3f46; }
+html.light .text-zinc-400 { color: #52525b; }
+html.light .text-zinc-500 { color: #71717a; }
+html.light .text-zinc-600 { color: #a1a1aa; }
+
+/* Vurgu (sky) — açık zeminde koyulaştır */
+html.light .text-sky-300 { color: #0369a1; }
+html.light .bg-sky-950\/30 { background-color: #e0f2fe; }
+html.light .bg-sky-400\/10 { background-color: #e0f2fe; }
+
+/* Durum renkleri */
+html.light .text-red-300 { color: #dc2626; }
+html.light .text-red-200 { color: #b91c1c; }
+html.light .bg-red-950\/50 { background-color: #fef2f2; }
+html.light .border-red-900 { border-color: #fecaca; }
+html.light .bg-red-900\/50 { background-color: #fee2e2; }
+html.light .text-amber-300 { color: #b45309; }
+html.light .text-amber-200 { color: #92400e; }
+html.light .bg-amber-950\/70 { background-color: #fef3c7; }
+html.light .bg-amber-950\/40 { background-color: #fffbeb; }
+html.light .border-amber-900\/60 { border-color: #fcd34d; }
+html.light .text-emerald-300 { color: #059669; }
+html.light .text-orange-300 { color: #ea580c; }
+
+/* Koyu kalan "hero" fiyat kutusu içindeki gri yazı okunur kalsın */
+html.light .from-sky-950\/60 .text-zinc-400 { color: #a1a1aa; }
+
+/* Hover / focus */
+html.light .hover\:bg-zinc-800:hover { background-color: #f4f4f5; }
+html.light .hover\:bg-zinc-700:hover { background-color: #e4e4e7; }
+html.light .hover\:text-sky-300:hover { color: #0369a1; }
+html.light .hover\:bg-red-800\/60:hover { background-color: #fecaca; }
+html.light .hover\:text-red-300:hover { color: #dc2626; }
+html.light .hover\:border-zinc-500:hover { border-color: #a1a1aa; }

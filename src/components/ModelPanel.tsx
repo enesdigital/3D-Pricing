@@ -59,9 +59,9 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
         <div className="grid grid-cols-3 gap-1">
           {(['rotX', 'rotY', 'rotZ'] as const).map((a) => (
             <div key={a} className="flex items-center rounded-md border border-zinc-700 bg-zinc-950">
-              <button className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, -90)}>−</button>
+              <button type="button" aria-label={`${a.slice(-1).toUpperCase()} eksenini 90° geri döndür`} title={`${a.slice(-1).toUpperCase()} −90°`} className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, -90)}><span aria-hidden="true">−</span></button>
               <span className="flex-1 text-center text-xs text-zinc-400">{a.slice(-1)} {placement[a]}°</span>
-              <button className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, 90)}>+</button>
+              <button type="button" aria-label={`${a.slice(-1).toUpperCase()} eksenini 90° ileri döndür`} title={`${a.slice(-1).toUpperCase()} +90°`} className="px-2 py-1 text-zinc-300 hover:bg-zinc-800" onClick={() => rot(a, 90)}><span aria-hidden="true">+</span></button>
             </div>
           ))}
         </div>
