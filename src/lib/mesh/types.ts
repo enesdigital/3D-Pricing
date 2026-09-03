@@ -12,7 +12,10 @@ export interface Placement {
 }
 
 /** Toplam ölçek çarpanı (birim × yüzde) */
-export const effectiveScale = (p: Placement) => p.unit * (p.scalePct / 100)
+export const effectiveScale = (p: Placement) => {
+  const s = (p.unit || 1) * ((p.scalePct || 100) / 100)
+  return Number.isFinite(s) && s > 0 ? s : 1
+}
 export const DEFAULT_PLACEMENT: Placement = { rotX: 0, rotY: 0, rotZ: 0, unit: 1, scalePct: 100 }
 
 import type { LayerProfile } from './slice.ts'

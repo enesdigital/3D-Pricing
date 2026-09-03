@@ -22,6 +22,12 @@ export interface FdmPrinterSpec {
   colorChangeTimeSec: number
   nozzleDiameter: number
   supportsMultiColor: boolean
+  /** Çift nozul: katman başına ilk renk geçişi nozul değişimidir (flush yok, sadece prime tower); 3+ renkte kalan geçişler AMS flush */
+  dualNozzle: boolean
+  /** Çift nozulda nozul değişimi başına israf (prime tower payı), g */
+  nozzleSwitchWasteGrams: number
+  /** Çift nozulda nozul değişimi süresi, sn */
+  nozzleSwitchTimeSec: number
   /** Ortalama baskı gücü W (PLA, sürekli) */
   avgPowerW: number
   /** Isınma/kalibrasyon evresi ortalama gücü W */

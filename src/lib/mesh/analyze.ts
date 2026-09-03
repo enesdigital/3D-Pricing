@@ -49,6 +49,7 @@ export interface AnalyzeResult {
  */
 export function analyzeMesh(pos: Float32Array, opts: AnalyzeOptions): AnalyzeResult {
   const triCount = Math.floor(pos.length / 9)
+  if (triCount === 0) throw new Error('Modelde üçgen yok.')
   const mask = new Uint8Array(triCount)
   const sinThr = Math.sin(opts.overhangThresholdDeg * DEG)
 
@@ -57,6 +58,9 @@ export function analyzeMesh(pos: Float32Array, opts: AnalyzeOptions): AnalyzeRes
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
   for (let i = 0; i < pos.length; i += 3) {
     const x = pos[i], y = pos[i + 1], z = pos[i + 2]
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      throw new Error(`Dosyada geçersiz koordinat (NaN/sonsuz) var (köşe #${i / 3}); dosya bozuk olabilir.`)
+    }
     if (x < minX) minX = x; if (x > maxX) maxX = x
     if (y < minY) minY = y; if (y > maxY) maxY = y
     if (z < minZ) minZ = z; if (z > maxZ) maxZ = z

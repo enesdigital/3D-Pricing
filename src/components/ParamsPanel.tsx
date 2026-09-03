@@ -35,9 +35,9 @@ export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrint
           </div>
           {params.colorCount > 1 && (
             <p className="mt-2 text-[11px] leading-snug text-zinc-500">
-              {printer.id === 'bambu-x2d-combo'
-                ? 'X2D çift nozul: 2 renkte flush yok, yalnızca prime tower; 3+ renkte AMS purge israfı artar.'
-                : 'Tek nozul + AMS: her renk değişiminde flush israfı ve ~1 dk süre eklenir; küçük çok renkli parçalarda israf malzemenin yarısını aşabilir.'}
+              {printer.spec.tech === 'fdm' && printer.spec.dualNozzle
+                ? 'Çift nozul: 2 renk flush\'sız basılır (yalnızca prime tower ve nozul değişimi); 3+ renkte kalan geçişler AMS purge israfı ekler.'
+                : 'Tek nozul + AMS: her renk değişiminde flush israfı ve ~1 dk süre eklenir; küçük çok renkli parçalarda israf malzemenin yarısını aşabilir. Renkler yalnızca bazı katmanlarda değişiyorsa "katman başına değişim" değerini düşürün.'}
             </p>
           )}
         </div>

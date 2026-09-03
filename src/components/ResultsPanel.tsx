@@ -82,7 +82,8 @@ export function ResultsPanel({ est, printer, material, settings }: { est: Estima
             <span>Üst/alt kabuk</span><span className="text-right tabular-nums">{(est.breakdown.skinVolume / 1000).toFixed(2)} cm³</span>
             <span>Dolgu</span><span className="text-right tabular-nums">{(est.breakdown.infillVolume / 1000).toFixed(2)} cm³</span>
             <span>Destek</span><span className="text-right tabular-nums">{(est.breakdown.supportVolume / 1000).toFixed(2)} cm³</span>
-            {est.breakdown.colorChanges > 0 && <><span>Renk değişimi / tabla</span><span className="text-right tabular-nums">{est.breakdown.colorChanges}</span></>}
+            {est.breakdown.colorChanges > 0 && <><span>AMS renk değişimi / tabla</span><span className="text-right tabular-nums">{est.breakdown.colorChanges}</span></>}
+            {est.breakdown.nozzleSwitches > 0 && <><span>Nozul değişimi / tabla</span><span className="text-right tabular-nums">{est.breakdown.nozzleSwitches}</span></>}
           </div>
         </details>
       )}

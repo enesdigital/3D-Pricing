@@ -15,7 +15,8 @@ interface Props {
 
 const FDM_DEFAULT: FdmPrinterSpec = {
   tech: 'fdm', maxFlow: 20, efficiencyScale: 0.9, outerWallSpeed: 150, layerChangeSec: 1.5, jobOverheadSec: 300,
-  jobWasteGrams: 1, colorChangeWasteGrams: 0.8, colorChangeTimeSec: 75, nozzleDiameter: 0.4, supportsMultiColor: false,
+  jobWasteGrams: 1, colorChangeWasteGrams: 0.5, colorChangeTimeSec: 75, nozzleDiameter: 0.4, supportsMultiColor: false,
+  dualNozzle: false, nozzleSwitchWasteGrams: 0.03, nozzleSwitchTimeSec: 8,
   avgPowerW: 120, heatupPowerW: 400,
 }
 const RESIN_DEFAULT: ResinPrinterSpec = {
@@ -41,7 +42,9 @@ const FDM_FIELDS: NumField<FdmPrinterSpec>[] = [
   { key: 'jobOverheadSec', label: 'İş başlangıcı (ısınma+kalibrasyon)', suffix: 'sn', step: 30 },
   { key: 'jobWasteGrams', label: 'İş başına israf', hint: 'Purge hattı, skirt', suffix: 'g', step: 0.1 },
   { key: 'colorChangeWasteGrams', label: 'Renk değişimi israfı', suffix: 'g', step: 0.1 },
-  { key: 'colorChangeTimeSec', label: 'Renk değişimi süresi', suffix: 'sn', step: 5 },
+  { key: 'colorChangeTimeSec', label: 'Renk değişimi süresi', hint: 'AMS/MMU yükle-boşalt', suffix: 'sn', step: 5 },
+  { key: 'nozzleSwitchWasteGrams', label: 'Nozul değişimi israfı', hint: 'Çift nozul: prime tower payı', suffix: 'g', step: 0.01 },
+  { key: 'nozzleSwitchTimeSec', label: 'Nozul değişimi süresi', hint: 'Çift nozul', suffix: 'sn', step: 1 },
   { key: 'nozzleDiameter', label: 'Nozul çapı', suffix: 'mm', step: 0.1 },
   { key: 'avgPowerW', label: 'Ortalama baskı gücü', suffix: 'W', step: 5 },
   { key: 'heatupPowerW', label: 'Isınma gücü', suffix: 'W', step: 50 },
@@ -143,7 +146,10 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
             </div>
             <div className="mt-3">
               {p.tech === 'fdm'
-                ? <Toggle checked={(p.spec as FdmPrinterSpec).supportsMultiColor} onChange={(v) => setSpec('supportsMultiColor', v)} label="Çok renkli sistem var (AMS / MMU / CFS)" />
+                ? <div className="space-y-2">
+                    <Toggle checked={(p.spec as FdmPrinterSpec).supportsMultiColor} onChange={(v) => setSpec('supportsMultiColor', v)} label="Çok renkli sistem var (AMS / MMU / CFS)" />
+                    <Toggle checked={(p.spec as FdmPrinterSpec).dualNozzle} onChange={(v) => setSpec('dualNozzle', v)} label="Çift nozul / IDEX (2 renk flush'sız basılır)" />
+                  </div>
                 : <Toggle checked={(p.spec as ResinPrinterSpec).tiltRelease} onChange={(v) => setSpec('tiltRelease', v)} label="Tilt-release (eğimli ayırma) var — dolu tablada kaldırma cezası uygulanmaz" />}
             </div>
           </section>

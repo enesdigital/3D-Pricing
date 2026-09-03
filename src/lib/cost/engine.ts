@@ -136,8 +136,12 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
   }
   const minLayer = material.minLayerTime * (lh / params.layerHeight)
   const supportTimePart = supportVolume / qBulk
-  // Renk değişimleri tabla başına: her katmanda bir kez yapılır, parça sayısından bağımsız
-  const colorChangesPlate = params.colorCount > 1 ? Math.round(layerCount * params.colorChangesPerLayer * (params.colorCount - 1)) : 0
+  // Renk değişimleri tabla başına: her katmanda yapılır, parça sayısından bağımsız.
+  // Çift nozulda katman başına ilk geçiş nozul değişimidir (flush yok); kalan geçişler AMS flush.
+  const changesPerLayer = params.colorCount > 1 ? params.colorChangesPerLayer * (params.colorCount - 1) : 0
+  const switchPerLayer = spec.dualNozzle && params.colorCount > 1 ? Math.min(changesPerLayer, params.colorChangesPerLayer) : 0
+  const nozzleSwitches = Math.round(layerCount * switchPerLayer)
+  const colorChangesPlate = Math.round(layerCount * (changesPerLayer - switchPerLayer))
 
   /** k parçalı bir tablanın süresi (sn) */
   const plateTime = (k: number) => {
@@ -148,10 +152,11 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
     }
     // Parçalar arası travel: ≤3 parçada ihmal, 10+ parçada baskı süresinin ~%2–5'i
     const travelFactor = k > 3 ? Math.min(0.05, 0.006 * (k - 3)) : 0
-    const t = (extrude + k * supportTimePart) * (1 + travelFactor) + layerCount * spec.layerChangeSec + colorChangesPlate * spec.colorChangeTimeSec
+    const t = (extrude + k * supportTimePart) * (1 + travelFactor) + layerCount * spec.layerChangeSec
+      + colorChangesPlate * spec.colorChangeTimeSec + nozzleSwitches * spec.nozzleSwitchTimeSec
     return spec.jobOverheadSec + t * settings.timeMultiplier
   }
-  const plateWasteGrams = spec.jobWasteGrams + colorChangesPlate * spec.colorChangeWasteGrams
+  const plateWasteGrams = spec.jobWasteGrams + colorChangesPlate * spec.colorChangeWasteGrams + nozzleSwitches * spec.nozzleSwitchWasteGrams
   const plateEnergyKWh = (t: number) => ((t - spec.jobOverheadSec) / 3600 * spec.avgPowerW * material.powerFactor + (spec.jobOverheadSec / 3600) * spec.heatupPowerW) / 1000
 
   // --- Tabla planı ---
@@ -172,7 +177,7 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
   const lines: CostLine[] = []
   lines.push({ key: 'material', label: 'Model malzemesi', amount: partGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partGrams.toFixed(1)} g ${material.name}` })
   if (partSupportGrams > 0) lines.push({ key: 'support', label: 'Destek malzemesi', amount: partSupportGrams * qty * price, detail: `${qty > 1 ? `${qty} × ` : ''}${partSupportGrams.toFixed(1)} g` })
-  lines.push({ key: 'waste', label: 'İsraf (purge/flush)', amount: totalWaste * price, detail: `${totalWaste.toFixed(1)} g · ${plates} tabla${colorChangesPlate ? ` · ${colorChangesPlate} renk değişimi/tabla` : ''}` })
+  lines.push({ key: 'waste', label: 'İsraf (purge/flush)', amount: totalWaste * price, detail: `${totalWaste.toFixed(1)} g · ${plates} tabla${colorChangesPlate ? ` · ${colorChangesPlate} AMS flush/tabla` : ''}${nozzleSwitches ? ` · ${nozzleSwitches} nozul değişimi/tabla` : ''}` })
   lines.push({ key: 'energy', label: 'Elektrik', amount: totalEnergy * settings.electricityTRYPerKWh, detail: `${totalEnergy.toFixed(2)} kWh` })
   const hours = totalTime / 3600
   lines.push({ key: 'machine', label: 'Makine amortismanı', amount: hours * (printer.priceTRY / printer.lifetimeHours), detail: `${hours.toFixed(2)} sa × ${(printer.priceTRY / printer.lifetimeHours).toFixed(2)} ₺/sa` })
@@ -186,7 +191,7 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }): Es
     plateTimeSec: fullPlateTime,
     totals: { materialGrams: (partGrams + partSupportGrams) * qty + totalWaste, supportGrams: partSupportGrams * qty, wasteGrams: totalWaste, printTimeSec: totalTime, energyKWh: totalEnergy },
     materialVolumeMm3: modelVolume + supportVolume, layerCount,
-    breakdown: { wallVolume, skinVolume, infillVolume, supportVolume, modelVolume, colorChanges: colorChangesPlate },
+    breakdown: { wallVolume, skinVolume, infillVolume, supportVolume, modelVolume, colorChanges: colorChangesPlate, nozzleSwitches },
   })
 }
 

@@ -25,10 +25,13 @@ export const PRINTERS: PrinterProfile[] = [
       layerChangeSec: 1.5,
       jobOverheadSec: 300,     // ısınma + titreşim testi + bed leveling + purge: 3–6 dk (forum ölçümleri)
       jobWasteGrams: 1.0,      // purge hattı (G1 E50 ≈ 0.15 g) + nozul temizliği + skirt
-      colorChangeWasteGrams: 0.8, // flush 280–600 mm³ + prime tower payı (~0.4–0.8 g); dark→light 1.0+
+      colorChangeWasteGrams: 0.5, // Bambu flush 107–800 mm³ (0.13–1.0 g) + prime tower payı; tipik ~0.35–0.5 g
       colorChangeTimeSec: 75,  // AMS lite yükle/boşalt ~1–1.5 dk
       nozzleDiameter: 0.4,
       supportsMultiColor: true,
+      dualNozzle: false,
+      nozzleSwitchWasteGrams: 0,
+      nozzleSwitchTimeSec: 0,
       avgPowerW: 95,           // Bambu Wiki resmi ölçüm: PLA 95 W, ABS 200 W
       heatupPowerW: 350,
     },
@@ -51,14 +54,17 @@ export const PRINTERS: PrinterProfile[] = [
       layerChangeSec: 1.2,
       jobOverheadSec: 540,     // kalibrasyon 6–8 dk (X serisi) + ısıtmalı kasa (65 °C) ön ısıtma
       jobWasteGrams: 1.5,
-      colorChangeWasteGrams: 0.4, // çift nozul: 2 renkte hotend flush yok, prime tower var; >2 renkte AMS purge devreye girer
-      colorChangeTimeSec: 20,
+      colorChangeWasteGrams: 0.5, // 3+ renkte aynı nozuldan AMS 2 Pro flush (A1 ile aynı mertebede)
+      colorChangeTimeSec: 60,
       nozzleDiameter: 0.4,
       supportsMultiColor: true,
+      dualNozzle: true,           // 2 renk: hotend flush yok, yalnızca prime tower (X2D FAQ)
+      nozzleSwitchWasteGrams: 0.03, // prime tower ~15–20 mm³ / değişim
+      nozzleSwitchTimeSec: 8,     // toolhead değişimi + ısı dengeleme
       avgPowerW: 180,          // resmi 250 W (PLA), CNC Kitchen ölçümü 160 W PLA / 330 W ASA (kasa ısıtmalı)
       heatupPowerW: 1200,
     },
-    notes: 'Kapalı, ısıtmalı kasa; çift nozul (ana + yardımcı). Çift nozul modunda tabla 235.5×256×256 mm.',
+    notes: 'Kapalı, ısıtmalı kasa; çift nozul (ana + yardımcı): 2 renk/malzeme flush olmadan basılır, 3+ renkte AMS purge devreye girer. Çift nozul modunda tabla 235.5×256×256 mm.',
   },
   {
     id: 'elegoo-jupiter-2',
