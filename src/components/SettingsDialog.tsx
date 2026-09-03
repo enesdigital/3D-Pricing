@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import type { BusinessSettings, Material, PrinterProfile } from '../lib/cost/types.ts'
 import { Button, Field, NumberInput } from './ui.tsx'
+import { CalibrationPanel } from './CalibrationPanel.tsx'
+import type { CalibrationRecord, CalibrationFactors } from '../lib/slicer/types.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
 
 export interface PrinterOverride { priceTRY?: number; lifetimeHours?: number; maintenanceTRYPerHour?: number; avgPowerW?: number }
@@ -17,6 +19,11 @@ interface Props {
   printerOverrides: Record<string, PrinterOverride>
   onPrinterOverride: (id: string, o: PrinterOverride) => void
   onReset: () => void
+  calibration?: {
+    records: CalibrationRecord[]; factors: CalibrationFactors; printers: PrinterProfile[]; materials: Material[]
+    current: { printerId: string; materialId: string; presetKey: string; modelName: string; modelTimeSec: number; modelGrams: number } | null
+    onAdd: (r: CalibrationRecord) => void; onDelete: (id: string) => void
+  }
 }
 
 export function SettingsDialog(p: Props) {
@@ -67,6 +74,13 @@ export function SettingsDialog(p: Props) {
               <Field label={t('settings.timeCalibration')} hint={t('settings.timeCalibrationHint')}><NumberInput value={s.timeMultiplier} onChange={(v) => set('timeMultiplier', v)} min={0.3} max={3} step={0.05} suffix="×" /></Field>
             </div>
           </section>
+
+          {p.calibration && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('calibration.title')}</h3>
+              <CalibrationPanel {...p.calibration} />
+            </section>
+          )}
 
           <section>
             <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('settings.secPdf')}</h3>

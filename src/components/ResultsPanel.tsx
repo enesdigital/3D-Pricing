@@ -5,7 +5,7 @@ import { useI18n } from '../lib/i18n/index.tsx'
 
 const fmtGrams = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${g.toFixed(1)} g`)
 
-export function ResultsPanel({ est, printer, material, settings }: { est: Estimate; printer: PrinterProfile; material: Material; settings: BusinessSettings }) {
+export function ResultsPanel({ est, printer, material, settings, calibSamples }: { est: Estimate; printer: PrinterProfile; material: Material; settings: BusinessSettings; calibSamples?: number }) {
   const { t: tr } = useI18n()
   const qty = est.quantity
   const u = est.perUnit
@@ -21,6 +21,11 @@ export function ResultsPanel({ est, printer, material, settings }: { est: Estima
       )}
 
       <div className="rounded-xl bg-gradient-to-br from-sky-950/60 to-zinc-900 p-4 ring-1 ring-sky-900/50">
+        {est.basis !== 'model' && (
+          <div className="mb-1 inline-block rounded bg-emerald-900/50 px-2 py-0.5 text-[11px] text-emerald-200">
+            {est.basis === 'slicer' ? tr('slicer.basisSlicer') : tr('slicer.basisCalibrated', { n: calibSamples ?? 0 })}
+          </div>
+        )}
         <div className="text-xs uppercase tracking-wide text-sky-300/80">{tr('results.salePrice')}</div>
         <div className="mt-1 text-3xl font-bold tabular-nums text-white">{fmtTRY(u.price)}<span className="ml-1 text-sm font-normal text-zinc-400">{tr('results.perUnit')}</span></div>
         <div className="mt-1 text-sm text-zinc-300">

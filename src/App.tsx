@@ -21,6 +21,8 @@ import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
 import { downloadQuotePdf, type QuoteImage, type QuotePricing } from './lib/pdf/quote.ts'
 import { imageSize } from './lib/pdf/image.ts'
 import { QuoteDialog } from './components/QuoteDialog.tsx'
+import { SlicerImport } from './components/SlicerImport.tsx'
+import { calibrationFactors, type CalibrationRecord, type SlicerData, type SlicerOverride } from './lib/slicer/index.ts'
 import { useI18n, LANGS } from './lib/i18n/index.tsx'
 
 const LS = 'fdm-sla-calc:v1:'
@@ -46,6 +48,12 @@ export default function App() {
   const [editor, setEditor] = useState<{ open: boolean; printer: PrinterProfile | null }>({ open: false, printer: null })
   const [matEditor, setMatEditor] = useState<{ open: boolean; material: Material | null }>({ open: false, material: null })
   const [customer, setCustomer] = useState('')
+  // Dilimleyici verisi ve kalibrasyon
+  const [slicerData, setSlicerData] = useState<SlicerData | null>(null)
+  const [partsInFile, setPartsInFile] = useState(1)
+  const [useSlicer, setUseSlicer] = useState(false)
+  const [calibAdded, setCalibAdded] = useState(false)
+  const [calibrations, setCalibrations] = useLocalStorage<CalibrationRecord[]>(LS + 'calibrations', [], (st, init) => (Array.isArray(st) ? (st as CalibrationRecord[]) : init))
   const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [quoteOpen, setQuoteOpen] = useState(false)
@@ -145,16 +153,41 @@ export default function App() {
 
   const onFile = useCallback(async (file: File) => {
     setPlacement((p) => (p.rotX === 0 && p.rotY === 0 && p.rotZ === 0 && p.unit === 1 && p.scalePct === 100 ? p : DEFAULT_PLACEMENT))
+    setSlicerData(null); setUseSlicer(false); setCalibAdded(false)
     await mesh.loadFile(file)
   }, [mesh])
 
   const stats = mesh.analysis.stats
-  const estimate = useMemo<Estimate | null>(() => {
+  const calibration = useMemo(() => (material ? calibrationFactors(calibrations, printer.id, material.id) : null), [calibrations, printer.id, material])
+  const slicerOverride = useMemo<SlicerOverride | null>(() => {
+    if (!useSlicer || !slicerData || slicerData.printTimeSec == null || slicerData.filamentGrams == null) return null
+    const n = Math.max(1, partsInFile)
+    return { partsInFile: n, partTimeSec: slicerData.printTimeSec / n, partGrams: slicerData.filamentGrams / n, fileName: slicerData.fileName }
+  }, [useSlicer, slicerData, partsInFile])
+  // Saf model tahmini (dilimleyici/kalibrasyon uygulanmadan) — fark göstermek ve kalibrasyon kaydı için
+  const modelEstimate = useMemo<Estimate | null>(() => {
     if (!stats || !material) return null
     return printer.tech === 'fdm'
       ? estimateFdm({ stats, printer, material, settings, params: fdmParams }, t)
       : estimateResin({ stats, printer, material, settings, params: resinParams }, t)
   }, [stats, printer, material, settings, fdmParams, resinParams, t])
+  const estimate = useMemo<Estimate | null>(() => {
+    if (!stats || !material) return null
+    if (!slicerOverride && (!calibration || calibration.samples === 0)) return modelEstimate
+    return printer.tech === 'fdm'
+      ? estimateFdm({ stats, printer, material, settings, params: fdmParams, slicer: slicerOverride, calibration }, t)
+      : estimateResin({ stats, printer, material, settings, params: resinParams, calibration }, t)
+  }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration, modelEstimate])
+  const presetKey = printer.tech === 'fdm' ? `${fdmParams.layerHeight}mm/${Math.round(fdmParams.infillDensity * 100)}%/${fdmParams.wallLoops}w` : `${resinParams.layerHeight}mm`
+  const addCalibrationFromSlicer = () => {
+    if (!modelEstimate || !material || !slicerOverride || !mesh.model) return
+    const rec: CalibrationRecord = {
+      id: `cal-${Date.now().toString(36)}`, date: new Date().toISOString(), printerId: printer.id, materialId: material.id, presetKey,
+      modelName: mesh.model.fileName, modelTimeSec: modelEstimate.single.printTimeSec, actualTimeSec: slicerOverride.partTimeSec,
+      modelGrams: modelEstimate.single.materialGrams, actualGrams: slicerOverride.partGrams, note: slicerOverride.fileName,
+    }
+    setCalibrations((list) => [...list, rec]); setCalibAdded(true)
+  }
 
   // Tüm yazıcılar için hızlı karşılaştırma
   const comparison = useMemo(() => {
@@ -229,6 +262,14 @@ export default function App() {
                 />
               </Card>
               <FileDrop onFile={onFile} compact />
+              <Card title={t('slicer.title')}>
+                <SlicerImport
+                  material={material ?? null} data={slicerData} partsInFile={partsInFile} useIt={useSlicer} modelEstimate={modelEstimate}
+                  onData={(d) => { setSlicerData(d); setCalibAdded(false); setUseSlicer(!!d && d.printTimeSec != null && d.filamentGrams != null) }}
+                  onPartsInFile={(n) => { setPartsInFile(n); setCalibAdded(false) }} onUse={setUseSlicer}
+                  onAddCalibration={addCalibrationFromSlicer} calibAdded={calibAdded}
+                />
+              </Card>
             </>
           )}
           {mesh.error && <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">{mesh.error}</div>}
@@ -351,7 +392,7 @@ export default function App() {
             </div>
           )}>
             {estimate && material ? (
-              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} />
+              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} calibSamples={calibration?.samples} />
             ) : (
               <div className="text-sm text-zinc-500">
                 {mesh.error ? (
@@ -413,6 +454,11 @@ export default function App() {
         settings={settings} onSettings={setSettings}
         materials={MATERIALS} materialPrices={materialPrices} onMaterialPrice={(id, price) => setMaterialPrices({ ...materialPrices, [id]: price })}
         printers={PRINTERS} printerOverrides={printerOverrides} onPrinterOverride={(id, o) => setPrinterOverrides({ ...printerOverrides, [id]: o })}
+        calibration={{
+          records: calibrations, factors: calibration ?? { timeFactor: 1, gramsFactor: 1, samples: 0, scope: 'none' }, printers, materials,
+          current: modelEstimate && material && mesh.model ? { printerId: printer.id, materialId: material.id, presetKey, modelName: mesh.model.fileName, modelTimeSec: modelEstimate.single.printTimeSec, modelGrams: modelEstimate.single.materialGrams } : null,
+          onAdd: (r) => setCalibrations((list) => [...list, r]), onDelete: (id) => setCalibrations((list) => list.filter((x) => x.id !== id)),
+        }}
         onReset={resetAll}
       />
     </div>

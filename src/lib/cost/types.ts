@@ -192,6 +192,8 @@ export interface EstimateTotals {
 
 export interface Estimate {
   tech: Tech
+  /** Süre/gram kaynağı: model tahmini, dilimleyici dosyası ya da kalibrasyonlu tahmin */
+  basis: 'model' | 'slicer' | 'calibrated'
   quantity: number
   /** Tabla başına sığan parça sayısı ve gereken tabla (iş) sayısı */
   partsPerPlate: number

@@ -1,4 +1,5 @@
 import type { MeshStats } from '../mesh/types.ts'
+import type { CalibrationFactors, SlicerOverride } from '../slicer/types.ts'
 import type {
   BusinessSettings, CostLine, Estimate, EstimateTotals, FdmPrinterSpec, FdmPrintParams, Material,
   PrinterProfile, ResinPrinterSpec, ResinPrintParams, Tech, Translate,
@@ -101,6 +102,10 @@ interface CommonInput {
   printer: PrinterProfile
   material: Material
   settings: BusinessSettings
+  /** Dilimleyici çıktısından parça başına gerçek süre/gram (varsa model tahmininin yerine geçer) */
+  slicer?: SlicerOverride | null
+  /** Kalibrasyon kayıtlarından türetilen düzeltme katsayıları (dilimleyici verisi yoksa uygulanır) */
+  calibration?: CalibrationFactors | null
 }
 
 /* ------------------------------------------------------------------ FDM */
@@ -136,8 +141,11 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
     supportVolume = stats.supportColumnVolume * params.supportDensity + stats.overhangProjectedArea * 2 * layerH
     supportVolume = Math.min(supportVolume, stats.size.x * stats.size.y * stats.size.z * 0.5)
   }
-  const partGrams = gramsFromMm3(modelVolume, material.density)
-  const partSupportGrams = gramsFromMm3(supportVolume, material.density)
+  const useSlicer = !!(input.slicer && input.slicer.partTimeSec > 0 && input.slicer.partGrams > 0)
+  const calib = !useSlicer && input.calibration && input.calibration.samples > 0 ? input.calibration : null
+  // Dilimleyici gramı destek ve purge'ü içerir → destek 0, model = dosya değeri; aksi halde model tahmini × kalibrasyon
+  const partGrams = useSlicer ? input.slicer!.partGrams : gramsFromMm3(modelVolume, material.density) * (calib?.gramsFactor ?? 1)
+  const partSupportGrams = useSlicer ? 0 : gramsFromMm3(supportVolume, material.density) * (calib?.gramsFactor ?? 1)
 
   // --- Efektif akış ---
   const qMax = Math.min(material.maxFlow, spec.maxFlow)
@@ -176,7 +184,12 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
     const travelFactor = k > 3 ? Math.min(0.05, 0.006 * (k - 3)) : 0
     const t = (extrude + k * supportTimePart) * (1 + travelFactor) + layerCount * spec.layerChangeSec
       + colorChangesPlate * spec.colorChangeTimeSec + nozzleSwitches * (spec.nozzleSwitchTimeSec ?? 0)
-    return spec.jobOverheadSec + t * settings.timeMultiplier
+    if (useSlicer) {
+      // Dilimleyici süresi tek parça için (iş başlangıcı dahil); k parça: başlangıç bir kez, baskı süresi k kat
+      const perPart = Math.max(0, input.slicer!.partTimeSec - spec.jobOverheadSec)
+      return spec.jobOverheadSec + perPart * k * (1 + travelFactor)
+    }
+    return spec.jobOverheadSec + t * settings.timeMultiplier * (calib?.timeFactor ?? 1)
   }
   const plateWasteGrams = spec.jobWasteGrams + colorChangesPlate * spec.colorChangeWasteGrams + nozzleSwitches * (spec.nozzleSwitchWasteGrams ?? 0)
   const plateEnergyKWh = (t: number) => ((t - spec.jobOverheadSec) / 3600 * spec.avgPowerW * material.powerFactor + (spec.jobOverheadSec / 3600) * spec.heatupPowerW) / 1000
@@ -207,6 +220,7 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
 
   return finalize({
     t,
+    basis: useSlicer ? 'slicer' : calib ? 'calibrated' : 'model',
     tech: 'fdm', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + plateWasteGrams },
     plateTimeSec: fullPlateTime,
@@ -244,8 +258,9 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
     supportVolume = Math.min(Math.max(pillars + raft, volume * params.supportRatio), volume * 0.6 + raft)
   }
   const wasteRatio = 0.08
-  const partGrams = gramsFromMm3(modelVolume, material.density)
-  const partSupportGrams = gramsFromMm3(supportVolume, material.density)
+  const calib = input.calibration && input.calibration.samples > 0 ? input.calibration : null
+  const partGrams = gramsFromMm3(modelVolume, material.density) * (calib?.gramsFactor ?? 1)
+  const partSupportGrams = gramsFromMm3(supportVolume, material.density) * (calib?.gramsFactor ?? 1)
   const partWasteGrams = (partGrams + partSupportGrams) * wasteRatio
 
   // --- Tabla planı ---
@@ -265,7 +280,7 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
     const bottom = Math.min(params.bottomLayers, layerCount)
     const normal = layerCount - bottom
     const layersTime = bottom * (params.bottomExposureSec + params.liftCycleSec) + normal * (params.exposureSec + params.liftCycleSec)
-    return 60 + layersTime * (1 + penalty) * settings.timeMultiplier
+    return 60 + layersTime * (1 + penalty) * settings.timeMultiplier * (calib?.timeFactor ?? 1)
   }
   const totalTime = sumPlates(plan, plateTime)
   const totalEnergy = sumPlates(plan, (k) => ((plateTime(k) / 3600) * spec.avgPowerW + (settings.resinPostMinutes / 60) * spec.postPowerW) / 1000)
@@ -293,6 +308,7 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
 
   return finalize({
     t,
+    basis: calib ? 'calibrated' : 'model',
     tech: 'resin', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + partWasteGrams },
     plateTimeSec: fullPlateTime,
@@ -306,6 +322,7 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
 
 function finalize(a: {
   t: Translate
+  basis: Estimate['basis']
   tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings
   lines: CostLine[]; warnings: string[]; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean
   single: { printTimeSec: number; materialGrams: number }; plateTimeSec: number
@@ -342,7 +359,7 @@ function finalize(a: {
     cost: cost / qty, price: price / qty, priceWithVat: priceWithVat / qty,
   }
   return {
-    tech: a.tech, quantity: qty, partsPerPlate: a.partsPerPlate, plates: a.plates,
+    tech: a.tech, basis: a.basis, quantity: qty, partsPerPlate: a.partsPerPlate, plates: a.plates,
     single: a.single, plateTimeSec: a.plateTimeSec, total, perUnit,
     materialVolumeMm3: a.materialVolumeMm3, layerCount: a.layerCount,
     lines, warnings, fits: fit.fits, fitsRotated: fit.fitsRotated, breakdown: a.breakdown,
