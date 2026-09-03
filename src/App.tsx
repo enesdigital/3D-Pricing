@@ -17,6 +17,7 @@ import { SettingsDialog, type PrinterOverride } from './components/SettingsDialo
 import { PrinterEditor } from './components/PrinterEditor.tsx'
 import { MaterialEditor } from './components/MaterialEditor.tsx'
 import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
+import { downloadQuotePdf } from './lib/pdf/quote.ts'
 
 const LS = 'fdm-sla-calc:v1:'
 
@@ -39,6 +40,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editor, setEditor] = useState<{ open: boolean; printer: PrinterProfile | null }>({ open: false, printer: null })
   const [matEditor, setMatEditor] = useState<{ open: boolean; material: Material | null }>({ open: false, material: null })
+  const [customer, setCustomer] = useState('')
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const mesh = useMeshWorker()
 
   // Etkin yazıcı / malzeme (override'lar uygulanmış)
@@ -257,9 +261,28 @@ export default function App() {
 
         {/* Sağ: sonuç */}
         <div className="space-y-4">
-          <Card title="Fiyat tahmini" right={estimate && <Button variant="ghost" onClick={() => window.print()}>🖨 Yazdır / PDF</Button>}>
+          <Card title="Fiyat tahmini" right={estimate && (
+            <div className="flex gap-1">
+              <Button variant="ghost" onClick={() => window.print()}>🖨 Yazdır</Button>
+              <Button variant="primary" disabled={pdfBusy} onClick={async () => {
+                if (!estimate || !stats || !material || !mesh.model) return
+                setPdfBusy(true); setPdfError(null)
+                try {
+                  await downloadQuotePdf({ est: estimate, stats, printer, material, settings, fdmParams, resinParams, placement, fileName: mesh.model.fileName, triangleCount: mesh.model.triangleCount, customer })
+                } catch (e) {
+                  setPdfError(e instanceof Error ? e.message : String(e))
+                } finally { setPdfBusy(false) }
+              }}>{pdfBusy ? 'Hazırlanıyor…' : '⬇ PDF indir'}</Button>
+            </div>
+          )}>
             {estimate && material ? (
-              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} />
+              <>
+                <div className="mb-3 flex items-center gap-2">
+                  <input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Müşteri adı (teklif PDF'i için, isteğe bağlı)" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" />
+                </div>
+                {pdfError && <div className="mb-3 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-xs text-red-200">PDF oluşturulamadı: {pdfError}</div>}
+                <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} />
+              </>
             ) : (
               <div className="text-sm text-zinc-500">
                 {mesh.error ? (

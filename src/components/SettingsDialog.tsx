@@ -67,6 +67,16 @@ export function SettingsDialog(p: Props) {
           </section>
 
           <section>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">Teklif PDF'i</h3>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field label="Firma / kişi adı" hint="PDF başlığında görünür"><input value={s.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder="Örn. Enes 3D Atölye" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label="İletişim" hint="Telefon, e-posta, adres"><input value={s.companyContact} onChange={(e) => set('companyContact', e.target.value)} placeholder="+90 5xx · ornek@eposta.com" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label="Teklif geçerliliği"><NumberInput value={s.quoteValidityDays} onChange={(v) => set('quoteValidityDays', Math.max(1, Math.round(v)))} min={1} step={1} suffix="gün" /></Field>
+              <div className="md:col-span-2"><Field label="Teklif notu"><textarea value={s.quoteNote} onChange={(e) => set('quoteNote', e.target.value)} rows={2} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field></div>
+            </div>
+          </section>
+
+          <section>
             <h3 className="mb-2 text-sm font-semibold text-zinc-200">Yazıcılar</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

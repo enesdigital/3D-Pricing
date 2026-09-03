@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.185.1"
@@ -21,6 +23,7 @@
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "dejavu-fonts-ttf": "^2.37.3",
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",

@@ -154,6 +154,11 @@ export interface BusinessSettings {
   resinPerPartMinutes: number
   /** Reçine: tabla kaplama oranı 1.0 iken katman süresine eklenen oran (ayrılma kuvveti için rest/lift yavaşlatma), üst sınır +%30 */
   resinLiftAreaPenalty: number
+  /** Teklif PDF'i başlık bilgileri */
+  companyName: string
+  companyContact: string
+  quoteValidityDays: number
+  quoteNote: string
 }
 
 export interface CostLine {

@@ -46,6 +46,10 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   fdmPerPartMinutes: 1.5,  // tabladan alma + temizlik
   resinPerPartMinutes: 5,  // destek sökme 2–15 dk (tipik 4–8)
   resinLiftAreaPenalty: 0.15, // T_plate × (1 + 0.15 × kaplama), üst sınır +%30; tilt-release makinelerde 0
+  companyName: '',
+  companyContact: '',
+  quoteValidityDays: 15,
+  quoteNote: 'Fiyatlar tahmini olup dilimleyici sonucu ve modelin baskı uygunluğuna göre değişebilir. Teslim süresi sipariş onayı sonrasında bildirilir.',
   vat: 0.2,
   minimumPriceTRY: 150,
   packagingTRY: 0,
