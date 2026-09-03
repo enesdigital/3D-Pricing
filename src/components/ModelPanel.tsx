@@ -37,6 +37,10 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
         <div className="min-w-0">
           <div className="truncate font-medium text-zinc-100" title={model.fileName}>{model.fileName}</div>
           <div className="text-xs text-zinc-500">{(model.fileSize / 1048576).toFixed(2)} MB · {t('model.triangles', { n: model.triangleCount.toLocaleString('tr-TR') })}{model.format ? ` · ${model.format}` : ''}</div>
+          {model.unit != null && model.fileName.toLowerCase().endsWith('.3mf') && (
+            <div className="text-[11px] text-sky-300/80">{t('model.importNote3mf', { unit: model.unit === 1 ? 'mm' : `×${model.unit} mm`, n: model.objectCount ?? 1, colors: model.colorHint && model.colorHint > 1 ? t('model.importColors', { c: model.colorHint }) : '' })}</div>
+          )}
+          {model.decimated && <div className="text-[11px] text-amber-300/80">{t('model.importDecimated')}</div>}
         </div>
         <Button variant="ghost" onClick={onClear} className="shrink-0">{t('model.remove')}</Button>
       </div>

@@ -171,6 +171,9 @@ export const en: Dict = {
     closed: `closed (manifold)`,
     openEdges: `{n} open edges`,
     shells: `shells`,
+    importNote3mf: `3MF: unit {unit}, {n} objects{colors}`,
+    importColors: `, {c} colours/extruders defined (colour count applied)`,
+    importDecimated: `Simplified for display (calculations use the full mesh)`,
     thickness: `Wall thickness`,
     thicknessVal: `thinnest 5%: {p5} mm · median {p50} mm · thin surface {pct}% (threshold {th} mm)`,
     thicknessSkipped: `mesh too dense, skipped`,
@@ -198,7 +201,7 @@ export const en: Dict = {
   fileDrop: {
     compact: `Click or drag to upload another file`,
     title: `Drag your STL file here`,
-    sub: `or click to select · .stl (binary/ASCII), .obj · max 200 MB`,
+    sub: `or click to select · STL, OBJ, 3MF, STEP/IGES · max 200 MB`,
     privacy: `Your file never leaves your browser; all computation happens on your device.`,
     sample: `Try with a sample model (pawn, 71 mm)`,
   },
@@ -575,7 +578,7 @@ export const en: Dict = {
     notReady: `Worker not ready.`,
     tooBig: `File too large ({size} MB). Max 200 MB.`,
     empty: `File is empty (0 bytes).`,
-    unsupported: `Supported formats: .stl (binary/ASCII) and .obj`,
+    unsupported: `Supported formats: .stl (binary/ASCII), .obj, .3mf, .step/.stp, .iges/.igs, .brep`,
     readFailed: `Could not read file: {message}`,
   },
 }

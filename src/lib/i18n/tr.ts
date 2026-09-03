@@ -169,6 +169,9 @@ export const tr = {
     closed: `kapalı (manifold)`,
     openEdges: `{n} açık kenar`,
     shells: `kabuk`,
+    importNote3mf: `3MF: birim {unit}, {n} nesne{colors}`,
+    importColors: `, {c} renk/ekstruder tanımlı (renk sayısı uygulandı)`,
+    importDecimated: `Görünüm için sadeleştirildi (hesaplar tam mesh üzerinde)`,
     thickness: `Duvar kalınlığı`,
     thicknessVal: `en ince %5: {p5} mm · medyan {p50} mm · ince yüzey %{pct} (eşik {th} mm)`,
     thicknessSkipped: `çok yoğun mesh, atlandı`,
@@ -196,7 +199,7 @@ export const tr = {
   fileDrop: {
     compact: `Başka bir dosya yüklemek için tıklayın veya sürükleyin`,
     title: `STL dosyanızı buraya sürükleyin`,
-    sub: `veya tıklayarak seçin · .stl (binary/ASCII), .obj · en fazla 200 MB`,
+    sub: `veya tıklayarak seçin · STL, OBJ, 3MF, STEP/IGES · en fazla 200 MB`,
     privacy: `Dosyanız tarayıcınızdan dışarı çıkmaz; tüm hesaplama cihazınızda yapılır.`,
     sample: `Örnek modelle dene (piyon, 71 mm)`,
   },
@@ -573,7 +576,7 @@ export const tr = {
     notReady: `Worker hazır değil.`,
     tooBig: `Dosya çok büyük ({size} MB). Üst sınır 200 MB.`,
     empty: `Dosya boş (0 bayt).`,
-    unsupported: `Desteklenen biçimler: .stl (binary/ASCII) ve .obj`,
+    unsupported: `Desteklenen biçimler: .stl (binary/ASCII), .obj, .3mf, .step/.stp, .iges/.igs, .brep`,
     readFailed: `Dosya okunamadı: {message}`,
   },
 }

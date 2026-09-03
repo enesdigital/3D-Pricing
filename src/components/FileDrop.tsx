@@ -27,7 +27,7 @@ export function FileDrop({ onFile, onSample, compact }: Props) {
         over ? 'border-sky-400 bg-sky-400/10' : 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/40'
       } ${compact ? 'p-3' : 'p-10'} text-center`}
     >
-      <input ref={inputRef} type="file" accept=".stl,.obj" className="hidden" onChange={(e) => { handle(e.target.files); e.target.value = '' }} />
+      <input ref={inputRef} type="file" accept=".stl,.obj,.3mf,.step,.stp,.iges,.igs,.brep" className="hidden" onChange={(e) => { handle(e.target.files); e.target.value = '' }} />
       {compact ? (
         <p className="text-sm text-zinc-300">{t('fileDrop.compact')}</p>
       ) : (

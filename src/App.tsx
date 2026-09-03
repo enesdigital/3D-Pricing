@@ -149,6 +149,16 @@ export default function App() {
 
   // Model yüklendiğinde / yerleşim, katman, eşik değiştiğinde yeniden analiz (debounce)
   const modelLoaded = !!mesh.model && mesh.model.positions.length > 0
+  // 3MF proje dosyasındaki renk/ekstruder sayısını FDM parametresine uygula (dosya başına bir kez)
+  const appliedHintFor = useRef<string | null>(null)
+  useEffect(() => {
+    const m = mesh.model
+    if (!m || !modelLoaded || !m.colorHint || m.colorHint <= 1) return
+    const key = m.fileName + ':' + m.fileSize
+    if (appliedHintFor.current === key) return
+    appliedHintFor.current = key
+    setFdmParams((p) => ({ ...p, colorCount: Math.min(16, m.colorHint!) }))
+  }, [mesh.model, modelLoaded, setFdmParams])
   useEffect(() => {
     if (!modelLoaded) return
     const t = setTimeout(() => mesh.analyze({ placement, overhangThresholdDeg, layerHeight, manifoldCheck, thickness: thicknessCheck }), 120)

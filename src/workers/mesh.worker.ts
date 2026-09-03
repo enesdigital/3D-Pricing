@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 import { parseStl } from '../lib/mesh/parseStl.ts'
 import { parseObj } from '../lib/mesh/parseObj.ts'
+import { parse3mf } from '../lib/mesh/parse3mf.ts'
+import { parseStep } from '../lib/mesh/parseStep.ts'
+import { decimateForDisplay } from '../lib/mesh/decimate.ts'
 import { analyzeMesh, transformPositions } from '../lib/mesh/analyze.ts'
 import { computeThickness } from '../lib/mesh/thickness.ts'
 import type { WorkerRequest, WorkerResponse } from '../lib/mesh/types.ts'
@@ -14,7 +17,7 @@ self.onerror = (e) => {
   post({ type: 'error', id: -1, message: typeof e === 'string' ? e : (e as ErrorEvent).message ?? 'Worker içinde beklenmeyen hata' })
 }
 
-self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
+self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
   const msg = ev.data
   try {
     if (msg.type === 'unload') {
@@ -25,11 +28,17 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
       original = null
       const ext = msg.fileName.toLowerCase().split('.').pop()
       const onProgress = (f: number) => post({ type: 'progress', id: msg.id, phase: 'parse', fraction: f })
-      const parsed = ext === 'obj' ? parseObj(msg.buffer, onProgress) : parseStl(msg.buffer, onProgress)
+      let unit = 1, colorHint: number | null = null, objectCount = 1
+      let parsed
+      if (ext === '3mf') { const p = parse3mf(msg.buffer, onProgress); parsed = p; unit = p.unit; colorHint = p.colorHint; objectCount = p.objectCount }
+      else if (ext === 'step' || ext === 'stp' || ext === 'iges' || ext === 'igs' || ext === 'brep' || ext === 'brp') parsed = await parseStep(msg.buffer, msg.fileName, onProgress)
+      else if (ext === 'obj') parsed = parseObj(msg.buffer, onProgress)
+      else parsed = parseStl(msg.buffer, onProgress)
       original = parsed.positions
-      // Render için bir kopya ana thread'e gönderilir (transfer), orijinal worker'da kalır.
-      const copy = parsed.positions.slice()
-      post({ type: 'loaded', id: msg.id, positions: copy, triangleCount: parsed.triangleCount, format: parsed.format }, [copy.buffer])
+      // Render için kopya (çok büyük mesh'te sadeleştirilmiş); orijinal worker'da kalır.
+      const DISPLAY_MAX = 1_500_000
+      const copy = parsed.triangleCount > DISPLAY_MAX ? await decimateForDisplay(parsed.positions, 1_000_000) : parsed.positions.slice()
+      post({ type: 'loaded', id: msg.id, positions: copy, triangleCount: parsed.triangleCount, format: parsed.format, unit, colorHint, objectCount, decimated: parsed.triangleCount > DISPLAY_MAX }, [copy.buffer])
       return
     }
     if (msg.type === 'analyze') {

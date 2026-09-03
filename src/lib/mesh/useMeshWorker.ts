@@ -9,8 +9,13 @@ export interface LoadedModel {
   fileSize: number
   format: string
   triangleCount: number
-  /** Orijinal (döndürülmemiş) konumlar; render için */
+  /** Görüntüleme konumları (çok büyük mesh'te sadeleştirilmiş); hesap worker'daki orijinalde */
   positions: Float32Array
+  /** 3MF birimi (mm çarpanı), renk ipucu, nesne sayısı, görüntü sadeleştirildi mi */
+  unit?: number
+  colorHint?: number | null
+  objectCount?: number
+  decimated?: boolean
 }
 
 export interface AnalysisState {
@@ -77,7 +82,7 @@ export function useMeshWorker(t: Translate) {
           if (msg.id !== loadId.current) return
           setState((s) => ({
             ...s,
-            model: s.model ? { ...s.model, positions: msg.positions, triangleCount: msg.triangleCount, format: msg.format } : null,
+            model: s.model ? { ...s.model, positions: msg.positions, triangleCount: msg.triangleCount, format: msg.format, unit: msg.unit, colorHint: msg.colorHint ?? null, objectCount: msg.objectCount, decimated: msg.decimated } : null,
             busy: 'idle',
             progress: 1,
             error: null,
@@ -128,7 +133,7 @@ export function useMeshWorker(t: Translate) {
       return false
     }
     const ext = file.name.toLowerCase().split('.').pop() ?? ''
-    if (!['stl', 'obj'].includes(ext)) {
+    if (!['stl', 'obj', '3mf', 'step', 'stp', 'iges', 'igs', 'brep', 'brp'].includes(ext)) {
       setState((s) => ({ ...s, error: tRef.current('mesh.unsupported') }))
       return false
     }

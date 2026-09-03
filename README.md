@@ -4,7 +4,7 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 
 ## Özellikler
 
-- 200 MB'a kadar binary/ASCII STL ve OBJ; ayrıştırma ve analiz Web Worker'da (arayüz donmaz)
+- 200 MB'a kadar binary/ASCII STL, OBJ, 3MF (birim, çoklu nesne, bileşen dönüşümleri, üretim uzantısı; Bambu/Orca proje 3MF'inden renk/ekstruder sayısı) ve STEP/IGES/BREP (occt-import-js, LGPL-2.1, ~7 MB WASM yalnızca gerektiğinde yüklenir); ayrıştırma ve analiz Web Worker'da (arayüz donmaz); 1,5 milyon üçgen üstünde görüntü meshoptimizer ile sadeleştirilir, hesaplar tam mesh'te kalır
 - Geometri: hacim, yüzey alanı, bounding box, tabla teması, sarkma (destek) yüzeyleri, manifold kontrolü, katman katman kesit alanı/çevre
 - Basılabilirlik (DFM): manifold/açık kenar, ayrı kabuk sayısı, ters çevrilmiş üçgenler, birim sezgisi (inç/mikron), devrilme riski, tabla teması; duvar kalınlığı analizi (yüzeyden içeri ışın, three-mesh-bvh) ile ince bölgeler kırmızı boyanır, en ince %5 ve ince yüzey oranı raporlanır (FDM eşiği 2 hat genişliği, reçine 0,6 mm)
 - 3B önizleme: yazıcı tablası, sarkmaların turuncu renklendirilmesi, ince duvarların kırmızı gösterimi, 90° döndürme, inç/mm

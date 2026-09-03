@@ -79,6 +79,6 @@ export type WorkerRequest =
 
 export type WorkerResponse =
   | { type: 'progress'; id: number; phase: 'parse' | 'analyze'; fraction: number }
-  | { type: 'loaded'; id: number; positions: Float32Array; triangleCount: number; format: string }
+  | { type: 'loaded'; id: number; positions: Float32Array; triangleCount: number; format: string; unit?: number; colorHint?: number | null; objectCount?: number; decimated?: boolean }
   | { type: 'analyzed'; id: number; stats: MeshStats; overhangMask: Uint8Array; thickness: ThicknessData | null }
   | { type: 'error'; id: number; message: string }
