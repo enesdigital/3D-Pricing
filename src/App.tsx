@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PRINTERS } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
-import { estimateFdm, estimateResin, checkFit } from './lib/cost/engine.ts'
+import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing } from './lib/cost/engine.ts'
 import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
@@ -124,6 +124,12 @@ export default function App() {
   }, [stats, printers, materials, printer.tech, material, settings, fdmParams, resinParams])
 
   const fits = stats ? checkFit(stats, printer).fits : true
+  const layout = useMemo(() => {
+    if (!stats) return null
+    const spacing = printer.tech === 'fdm' ? settings.fdmPartSpacingMm : resinSpacing(stats, settings.resinPartSpacingMm)
+    return plateLayout(stats, printer, spacing, settings.plateMarginMm)
+  }, [stats, printer, settings.fdmPartSpacingMm, settings.resinPartSpacingMm, settings.plateMarginMm])
+  const qty = Math.max(1, Math.floor(settings.quantity))
   const bedForViewer = useMemo(() => ({ x: printer.bed.x, y: printer.bed.y, z: printer.bed.z }), [printer])
   const busyLabel = mesh.busy === 'reading' ? 'Dosya okunuyor' : mesh.busy === 'parsing' ? 'STL ayrıştırılıyor' : mesh.busy === 'analyzing' ? 'Geometri analiz ediliyor' : ''
 
@@ -212,11 +218,24 @@ export default function App() {
               bboxMax={stats?.max ?? null}
               bed={bedForViewer}
               fits={fits}
+              copies={qty}
+              layout={layout}
             />
             <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-400">
               {printer.brand} {printer.name} · tabla {printer.bed.x}×{printer.bed.y}×{printer.bed.z} mm
               {stats && !fits && <span className="ml-2 text-red-300">— model sığmıyor</span>}
+              {stats && layout && layout.capacity > 0 && qty > 1 && (
+                <span className={`ml-2 ${qty > layout.capacity ? 'text-amber-300' : 'text-emerald-300'}`}>
+                  — {Math.min(qty, layout.capacity)} / {qty} adet gösteriliyor ({layout.cols}×{layout.rows}{layout.rotated ? ', 90° döndürülmüş' : ''})
+                  {qty > layout.capacity && ` · ${Math.ceil(qty / layout.capacity)} tabla gerekir`}
+                </span>
+              )}
             </div>
+            {stats && layout && qty > layout.capacity && layout.capacity > 0 && (
+              <div className="pointer-events-none absolute bottom-3 left-3 right-3 rounded-md border border-amber-900/60 bg-amber-950/70 px-3 py-2 text-xs text-amber-200">
+                ⚠ {qty} adet tek tablaya sığmıyor: tabla başına en fazla {layout.capacity} parça ({layout.cols}×{layout.rows}). Sipariş {Math.ceil(qty / layout.capacity)} ayrı baskıda tamamlanır; gösterilen ilk tabladır.
+              </div>
+            )}
             {!modelLoaded && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-600">
                 Model yüklendiğinde burada görünecek · sürükle: döndür · tekerlek: yakınlaştır

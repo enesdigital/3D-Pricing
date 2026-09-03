@@ -20,21 +20,49 @@ export function checkFit(stats: MeshStats, printer: PrinterProfile): { fits: boo
   return { fits, fitsRotated }
 }
 
+export interface PlateLayout {
+  /** Tabla başına sığan parça */
+  capacity: number
+  cols: number
+  rows: number
+  /** Parça 90° döndürülerek yerleştirildi mi (X/Y takas) */
+  rotated: boolean
+  /** Hücre boyutu (döndürme sonrası), mm */
+  cellX: number
+  cellY: number
+  spacing: number
+  margin: number
+}
+
 /**
- * Tablaya sığan parça sayısı: bounding box ızgara yerleşimi + boşluk + kenar payı; 90° döndürülmüş varyant da denenir.
- * Z'de istifleme yapılmaz.
+ * Tabla yerleşimi: bounding box ızgara + boşluk + kenar payı; 90° döndürülmüş varyant da denenir, çok olan seçilir.
+ * Z'de istifleme yapılmaz. Model tablaya hiç sığmıyorsa capacity 0 döner.
  */
-export function plateCapacity(stats: MeshStats, printer: PrinterProfile, spacing: number, margin: number): number {
+export function plateLayout(stats: MeshStats, printer: PrinterProfile, spacing: number, margin: number): PlateLayout {
   const ux = printer.bed.x - 2 * margin
   const uy = printer.bed.y - 2 * margin
-  const fit = (px: number, py: number) => {
-    if (px <= 0 || py <= 0) return 0
-    const nx = Math.floor((ux + spacing) / (px + spacing))
-    const ny = Math.floor((uy + spacing) / (py + spacing))
-    return Math.max(0, nx) * Math.max(0, ny)
+  const grid = (px: number, py: number) => {
+    if (px <= 0 || py <= 0 || stats.size.z > printer.bed.z + 0.01) return { cols: 0, rows: 0 }
+    return { cols: Math.max(0, Math.floor((ux + spacing) / (px + spacing))), rows: Math.max(0, Math.floor((uy + spacing) / (py + spacing))) }
   }
-  if (stats.size.z > printer.bed.z + 0.01) return 0
-  return Math.max(fit(stats.size.x, stats.size.y), fit(stats.size.y, stats.size.x))
+  const a = grid(stats.size.x, stats.size.y)
+  const b = grid(stats.size.y, stats.size.x)
+  const rotated = b.cols * b.rows > a.cols * a.rows
+  const g = rotated ? b : a
+  return {
+    capacity: g.cols * g.rows, cols: g.cols, rows: g.rows, rotated,
+    cellX: rotated ? stats.size.y : stats.size.x, cellY: rotated ? stats.size.x : stats.size.y,
+    spacing, margin,
+  }
+}
+
+export function plateCapacity(stats: MeshStats, printer: PrinterProfile, spacing: number, margin: number): number {
+  return plateLayout(stats, printer, spacing, margin).capacity
+}
+
+/** Reçinede büyük taban alanlı parçalar (>40 cm²) için aralık en az 15 mm */
+export function resinSpacing(stats: MeshStats, base: number): number {
+  return stats.size.x * stats.size.y > 4000 ? Math.max(base, 15) : base
 }
 
 /** Adet → tabla dağılımı: [dolu tabla sayısı, son tabladaki parça] */
@@ -194,9 +222,8 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams })
   const partWasteGrams = (partGrams + partSupportGrams) * wasteRatio
 
   // --- Tabla planı ---
-  // Büyük taban alanlı parçalarda (>40 cm²) ayrılma kuvveti için parça aralığı 15 mm'e çıkarılır
   const footprint = stats.size.x * stats.size.y
-  const spacing = footprint > 4000 ? Math.max(settings.resinPartSpacingMm, 15) : settings.resinPartSpacingMm
+  const spacing = resinSpacing(stats, settings.resinPartSpacingMm)
   const partsPerPlate = plateCapacity(stats, printer, spacing, settings.plateMarginMm)
   const { plates, loads } = planPlates(qty, partsPerPlate)
   const plateArea = printer.bed.x * printer.bed.y
@@ -274,6 +301,7 @@ function finalize(a: {
   const fit = checkFit(stats, printer)
   const warnings = [...a.warnings]
   if (!fit.fits && fit.fitsRotated) warnings.push('Model tablaya yalnızca 90° döndürülünce sığıyor.')
+  if (fit.fitsRotated && qty > a.partsPerPlate) warnings.push(`${qty} adet tek tablaya sığmıyor: tabla başına ${a.partsPerPlate} parça, toplam ${a.plates} tabla (iş) gerekir. 3B görünümde ilk tabla gösteriliyor.`)
   if (!fit.fitsRotated) warnings.push(`Model bu yazıcının tablasına sığmıyor (${stats.size.x.toFixed(0)}×${stats.size.y.toFixed(0)}×${stats.size.z.toFixed(0)} mm > ${printer.bed.x}×${printer.bed.y}×${printer.bed.z} mm).`)
   if (stats.manifold.checked && !stats.manifold.isClosed) warnings.push(`Mesh kapalı değil (${stats.manifold.openEdges} açık, ${stats.manifold.nonManifoldEdges} non-manifold kenar); hacim tahmini sapabilir. Dilimleyicide onarım önerilir.`)
   if (stats.invertedWinding) warnings.push('Yüzey normalleri ters görünüyor; hacim mutlak değer olarak alındı.')

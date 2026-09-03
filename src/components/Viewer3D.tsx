@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { effectiveScale, type Placement, type Vec3 } from '../lib/mesh/types.ts'
+import type { PlateLayout } from '../lib/cost/engine.ts'
 
 interface Props {
   positions: Float32Array | null
@@ -12,13 +13,17 @@ interface Props {
   bboxMax: Vec3 | null
   bed: { x: number; y: number; z: number; shape?: 'rect' }
   fits: boolean
+  /** Gösterilecek kopya sayısı ve tabla yerleşimi (adet > 1) */
+  copies: number
+  layout: PlateLayout | null
 }
 
 const COLOR_NORMAL = new THREE.Color('#60a5fa')
 const COLOR_OVERHANG = new THREE.Color('#f97316')
 const COLOR_BED = new THREE.Color('#22c55e')
+const MAX_INSTANCES = 400
 
-export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax, bed, fits }: Props) {
+export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax, bed, fits, copies, layout }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -28,7 +33,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     root: THREE.Group   // Z-up → Y-up dönüşümü
     bedGroup: THREE.Group
     modelGroup: THREE.Group
-    mesh: THREE.Mesh | null
+    mesh: THREE.InstancedMesh | null
   } | null>(null)
 
   // Sahne kurulumu
@@ -149,34 +154,65 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide })
-    const mesh = new THREE.Mesh(geo, mat)
+    const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
+    mesh.count = 1
+    mesh.frustumCulled = false
     s.modelGroup.add(mesh)
     s.mesh = mesh
   }, [positions, overhangMask])
 
-  // Yerleşim: döndürme/ölçek + tablaya ortalama
+  // Yerleşim: döndürme/ölçek + tabla ızgarası (adet kopyaları) + kamera odağı
   useEffect(() => {
     const s = sceneRef.current
     if (!s || !s.mesh) return
     const DEG = Math.PI / 180
-    s.mesh.rotation.set(0, 0, 0)
-    s.mesh.scale.setScalar(effectiveScale(placement))
-    // analyze.ts: R = Rz·Ry·Rx (önce X, sonra Y, sonra Z) → three Euler 'XYZ' aynı sıra
-    s.mesh.rotation.set(placement.rotX * DEG, placement.rotY * DEG, placement.rotZ * DEG, 'XYZ')
-    if (bboxMin && bboxMax) {
-      const cx = (bboxMin.x + bboxMax.x) / 2
-      const cy = (bboxMin.y + bboxMax.y) / 2
-      s.modelGroup.position.set(bed.x / 2 - cx, bed.y / 2 - cy, -bboxMin.z)
-      // Kamerayı modele odakla (Z-up → three: y = z, z = -y)
-      const h = bboxMax.z - bboxMin.z
-      const maxDim = Math.max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y, h)
-      const d = Math.max(maxDim * 3.2, 120)
-      s.controls.target.set(bed.x / 2, h / 2, -bed.y / 2)
-      s.camera.position.set(bed.x / 2 + d * 0.6, h / 2 + d * 0.45, -bed.y / 2 + d * 0.6)
-    } else {
-      s.modelGroup.position.set(0, 0, 0)
+    const base = new THREE.Matrix4().compose(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(placement.rotX * DEG, placement.rotY * DEG, placement.rotZ * DEG, 'XYZ')),
+      new THREE.Vector3().setScalar(effectiveScale(placement)),
+    )
+    s.modelGroup.position.set(0, 0, 0)
+    if (!bboxMin || !bboxMax) {
+      s.mesh.count = 1
+      s.mesh.setMatrixAt(0, base)
+      s.mesh.instanceMatrix.needsUpdate = true
+      return
     }
-  }, [placement, bboxMin, bboxMax, bed.x, bed.y, positions])
+    const bcx = (bboxMin.x + bboxMax.x) / 2, bcy = (bboxMin.y + bboxMax.y) / 2
+    const h = bboxMax.z - bboxMin.z
+    const toOrigin = new THREE.Matrix4().makeTranslation(-bcx, -bcy, -bboxMin.z)
+    const shown = layout && layout.capacity > 0 ? Math.min(copies, layout.capacity, MAX_INSTANCES) : 1
+    const tmp = new THREE.Matrix4()
+    if (!layout || shown <= 1) {
+      // Tek parça: tabla merkezi
+      tmp.makeTranslation(bed.x / 2, bed.y / 2, 0).multiply(toOrigin).multiply(base)
+      s.mesh.setMatrixAt(0, tmp)
+      s.mesh.count = 1
+    } else {
+      const rot = new THREE.Matrix4().makeRotationZ(layout.rotated ? Math.PI / 2 : 0)
+      const cols = Math.max(1, layout.cols)
+      const rowsUsed = Math.ceil(shown / cols)
+      const colsUsed = Math.min(cols, shown)
+      const gridW = colsUsed * layout.cellX + (colsUsed - 1) * layout.spacing
+      const gridH = rowsUsed * layout.cellY + (rowsUsed - 1) * layout.spacing
+      const x0 = (bed.x - gridW) / 2 + layout.cellX / 2
+      const y0 = (bed.y - gridH) / 2 + layout.cellY / 2
+      for (let i = 0; i < shown; i++) {
+        const c = i % cols, r = Math.floor(i / cols)
+        tmp.makeTranslation(x0 + c * (layout.cellX + layout.spacing), y0 + r * (layout.cellY + layout.spacing), 0)
+          .multiply(rot).multiply(toOrigin).multiply(base)
+        s.mesh.setMatrixAt(i, tmp)
+      }
+      s.mesh.count = shown
+    }
+    s.mesh.instanceMatrix.needsUpdate = true
+
+    // Kamerayı sahneye odakla (tek parça: modele; çoklu: tablaya)
+    const focus = shown > 1 ? Math.max(bed.x, bed.y, h) : Math.max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y, h)
+    const d = Math.max(focus * (shown > 1 ? 1.6 : 3.2), 120)
+    s.controls.target.set(bed.x / 2, h / 2, -bed.y / 2)
+    s.camera.position.set(bed.x / 2 + d * 0.6, h / 2 + d * 0.45, -bed.y / 2 + d * 0.6)
+  }, [placement, bboxMin, bboxMax, bed.x, bed.y, positions, copies, layout])
 
   return <div ref={mountRef} className="h-full w-full" />
 }
