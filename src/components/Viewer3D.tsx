@@ -7,6 +7,8 @@ import type { PlateLayout } from '../lib/cost/engine.ts'
 interface Props {
   positions: Float32Array | null
   overhangMask: Uint8Array | null
+  /** İnce duvar bayrağı (üçgen başına), kırmızı boyanır */
+  thinMask?: Uint8Array | null
   placement: Placement
   /** Modelin yerleştirilmiş bounding box'ı (mm) — bed ortalaması için */
   bboxMin: Vec3 | null
@@ -23,9 +25,10 @@ interface Props {
 const COLOR_NORMAL = new THREE.Color('#60a5fa')
 const COLOR_OVERHANG = new THREE.Color('#f97316')
 const COLOR_BED = new THREE.Color('#22c55e')
+const COLOR_THIN = new THREE.Color('#ef4444')
 const MAX_INSTANCES = 400
 
-export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax, bed, fits, copies, layout, captureRef }: Props) {
+export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin, bboxMax, bed, fits, copies, layout, captureRef }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const colorVersion = useRef(-1)
   const sceneRef = useRef<{
@@ -170,9 +173,10 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     const colors = attr.array as Float32Array
     const triCount = colors.length / 9
     const maskOk = overhangMask && overhangMask.length === triCount ? overhangMask : null
+    const thinOk = thinMask && thinMask.length === triCount ? thinMask : null
     for (let t = 0; t < triCount; t++) {
       const m = maskOk ? maskOk[t] : 0
-      const c = m === 1 ? COLOR_OVERHANG : m === 2 ? COLOR_BED : COLOR_NORMAL
+      const c = thinOk && thinOk[t] ? COLOR_THIN : m === 1 ? COLOR_OVERHANG : m === 2 ? COLOR_BED : COLOR_NORMAL
       for (let k = 0; k < 3; k++) {
         colors[t * 9 + k * 3] = c.r
         colors[t * 9 + k * 3 + 1] = c.g
@@ -180,7 +184,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
       }
     }
     attr.needsUpdate = true
-  }, [positions, overhangMask])
+  }, [positions, overhangMask, thinMask])
 
   // Yerleşim: döndürme/ölçek + tabla ızgarası (adet kopyaları) + kamera odağı
   useEffect(() => {

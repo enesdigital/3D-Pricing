@@ -6,7 +6,8 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 
 - 200 MB'a kadar binary/ASCII STL ve OBJ; ayrıştırma ve analiz Web Worker'da (arayüz donmaz)
 - Geometri: hacim, yüzey alanı, bounding box, tabla teması, sarkma (destek) yüzeyleri, manifold kontrolü, katman katman kesit alanı/çevre
-- 3B önizleme: yazıcı tablası, sarkmaların turuncu renklendirilmesi, 90° döndürme, inç/mm
+- Basılabilirlik (DFM): manifold/açık kenar, ayrı kabuk sayısı, ters çevrilmiş üçgenler, birim sezgisi (inç/mikron), devrilme riski, tabla teması; duvar kalınlığı analizi (yüzeyden içeri ışın, three-mesh-bvh) ile ince bölgeler kırmızı boyanır, en ince %5 ve ince yüzey oranı raporlanır (FDM eşiği 2 hat genişliği, reçine 0,6 mm)
+- 3B önizleme: yazıcı tablası, sarkmaların turuncu renklendirilmesi, ince duvarların kırmızı gösterimi, 90° döndürme, inç/mm
 - FDM modeli: duvar + üst/alt kabuk + dolgu + destek + purge/flush israfı; katman bazlı süre (malzeme/makine akış tavanı, min. katman süresi, ısınma/kalibrasyon, AMS renk değişimi)
 - Reçine modeli: hacim + destek + boşaltma; katman × (pozlama + kaldırma döngüsü); IPA, FEP/LCD sarfı
 - Maliyet: malzeme, elektrik, amortisman, bakım, işçilik, başarısızlık riski, kâr marjı, KDV, minimum sipariş, adet

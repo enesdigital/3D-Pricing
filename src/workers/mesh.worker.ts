@@ -2,6 +2,7 @@
 import { parseStl } from '../lib/mesh/parseStl.ts'
 import { parseObj } from '../lib/mesh/parseObj.ts'
 import { analyzeMesh, transformPositions } from '../lib/mesh/analyze.ts'
+import { computeThickness } from '../lib/mesh/thickness.ts'
 import type { WorkerRequest, WorkerResponse } from '../lib/mesh/types.ts'
 
 let original: Float32Array | null = null
@@ -40,7 +41,19 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
         layerHeight: msg.layerHeight,
         onProgress: (f) => post({ type: 'progress', id: msg.id, phase: 'analyze', fraction: f }),
       })
-      post({ type: 'analyzed', id: msg.id, stats: result.stats, overhangMask: result.overhangMask }, [result.overhangMask.buffer])
+      let thickness = null
+      if (msg.thickness) {
+        try {
+          thickness = computeThickness(placed, 20000, 1_500_000, (f) => post({ type: 'progress', id: msg.id, phase: 'analyze', fraction: 0.95 + 0.05 * f }))
+        } catch (e) {
+          thickness = null
+          post({ type: 'progress', id: msg.id, phase: 'analyze', fraction: 1 })
+          console.warn('thickness failed', e)
+        }
+      }
+      const transfer: Transferable[] = [result.overhangMask.buffer]
+      if (thickness) transfer.push(thickness.samples.buffer, thickness.tri.buffer)
+      post({ type: 'analyzed', id: msg.id, stats: result.stats, overhangMask: result.overhangMask, thickness }, transfer)
     }
   } catch (e) {
     post({ type: 'error', id: (msg as { id?: number }).id ?? -1, message: e instanceof Error ? e.message : String(e) })

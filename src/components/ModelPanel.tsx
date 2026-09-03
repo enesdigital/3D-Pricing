@@ -1,4 +1,4 @@
-import { effectiveScale, type MeshStats, type Placement } from '../lib/mesh/types.ts'
+import { effectiveScale, type MeshStats, type Placement, type ThicknessData } from '../lib/mesh/types.ts'
 import type { LoadedModel } from '../lib/mesh/useMeshWorker.ts'
 import { Button, NumberInput, Toggle } from './ui.tsx'
 import { useI18n } from '../lib/i18n/index.tsx'
@@ -11,11 +11,15 @@ interface Props {
   manifoldCheck: boolean
   onManifoldCheck: (v: boolean) => void
   onClear: () => void
+  thicknessCheck: boolean
+  onThicknessCheck: (v: boolean) => void
+  thickness: ThicknessData | null
+  thinness: { fraction: number; thresholdMm: number; p5: number } | null
 }
 
 const fmt = (n: number, d = 1) => n.toLocaleString('tr-TR', { maximumFractionDigits: d })
 
-export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck, onManifoldCheck, onClear }: Props) {
+export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck, onManifoldCheck, onClear, thicknessCheck, onThicknessCheck, thickness, thinness }: Props) {
   const { t } = useI18n()
   const rot = (axis: 'rotX' | 'rotY' | 'rotZ', d: number) => onPlacement({ ...placement, [axis]: ((placement[axis] + d) % 360 + 360) % 360 })
   const inch = placement.unit === 25.4
@@ -53,6 +57,14 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
           <span className={`text-right ${stats.manifold.checked ? (stats.manifold.isClosed ? 'text-emerald-300' : 'text-amber-300') : 'text-zinc-500'}`}>
             {stats.manifold.checked ? (stats.manifold.isClosed ? t('model.closed') : t('model.openEdges', { n: stats.manifold.openEdges })) : t('model.notChecked')}{stats.manifold.checked && stats.manifold.components > 1 ? ` · ${stats.manifold.components} ${t('model.shells')}` : ''}
           </span>
+          {thicknessCheck && (
+            <>
+              <span className="text-zinc-500">{t('model.thickness')}</span>
+              <span className={`text-right ${thinness && thinness.fraction >= 0.03 ? 'text-red-300' : 'text-zinc-200'}`}>
+                {thickness?.skipped ? t('model.thicknessSkipped') : thinness ? t('model.thicknessVal', { p5: thinness.p5.toFixed(2), p50: (thickness?.p50 ?? 0).toFixed(2), pct: Math.round(thinness.fraction * 100), th: thinness.thresholdMm.toFixed(1) }) : '…'}
+              </span>
+            </>
+          )}
         </div>
       )}
 
@@ -86,6 +98,7 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
       <div className="flex flex-wrap items-center gap-3">
         <Toggle checked={inch} onChange={(v) => onPlacement({ ...placement, unit: v ? 25.4 : 1 })} label={t('model.inchUnit')} />
         <Toggle checked={manifoldCheck} onChange={onManifoldCheck} label={t('model.manifoldCheck')} />
+        <Toggle checked={thicknessCheck} onChange={onThicknessCheck} label={t('model.thicknessToggle')} />
       </div>
       <p className="text-[11px] leading-snug text-zinc-500">{t('model.colorsPrefix')}<span className="text-sky-300">{t('model.colorBlue')}</span>{t('model.colorBlueDesc')}<span className="text-orange-300">{t('model.colorOrange')}</span>{t('model.colorOrangeDesc')}<span className="text-emerald-300">{t('model.colorGreen')}</span>{t('model.colorGreenDesc')}</p>
     </div>

@@ -1,5 +1,15 @@
 export interface Vec3 { x: number; y: number; z: number }
 
+/** Duvar kalınlığı örnekleri (worker'dan transfer edilir) */
+export interface ThicknessData {
+  samples: Float32Array
+  tri: Uint32Array
+  p5: number
+  p50: number
+  sampleCount: number
+  skipped: boolean
+}
+
 /** Modelin bed üzerindeki yerleşimi: derece cinsinden döndürme + ölçek. */
 export interface Placement {
   rotX: number
@@ -64,11 +74,11 @@ export interface MeshStats {
 
 export type WorkerRequest =
   | { type: 'load'; id: number; buffer: ArrayBuffer; fileName: string }
-  | { type: 'analyze'; id: number; placement: Placement; overhangThresholdDeg: number; manifoldCheck: boolean; layerHeight: number }
+  | { type: 'analyze'; id: number; placement: Placement; overhangThresholdDeg: number; manifoldCheck: boolean; layerHeight: number; thickness: boolean }
   | { type: 'unload' }
 
 export type WorkerResponse =
   | { type: 'progress'; id: number; phase: 'parse' | 'analyze'; fraction: number }
   | { type: 'loaded'; id: number; positions: Float32Array; triangleCount: number; format: string }
-  | { type: 'analyzed'; id: number; stats: MeshStats; overhangMask: Uint8Array }
+  | { type: 'analyzed'; id: number; stats: MeshStats; overhangMask: Uint8Array; thickness: ThicknessData | null }
   | { type: 'error'; id: number; message: string }

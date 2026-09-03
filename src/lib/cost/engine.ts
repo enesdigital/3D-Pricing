@@ -106,6 +106,8 @@ interface CommonInput {
   slicer?: SlicerOverride | null
   /** Kalibrasyon kayıtlarından türetilen düzeltme katsayıları (dilimleyici verisi yoksa uygulanır) */
   calibration?: CalibrationFactors | null
+  /** Duvar kalınlığı analizi özeti (ince yüzey oranı, eşik, 5. yüzdelik) */
+  thinness?: { fraction: number; thresholdMm: number; p5: number } | null
 }
 
 /* ------------------------------------------------------------------ FDM */
@@ -221,7 +223,7 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
   return finalize({
     t,
     basis: useSlicer ? 'slicer' : calib ? 'calibrated' : 'model',
-    tech: 'fdm', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated,
+    tech: 'fdm', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated, thinness: input.thinness,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + plateWasteGrams },
     plateTimeSec: fullPlateTime,
     totals: { materialGrams: (partGrams + partSupportGrams) * qty + totalWaste, supportGrams: partSupportGrams * qty, wasteGrams: totalWaste, printTimeSec: totalTime, energyKWh: totalEnergy },
@@ -309,7 +311,7 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
   return finalize({
     t,
     basis: calib ? 'calibrated' : 'model',
-    tech: 'resin', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated,
+    tech: 'resin', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated, thinness: input.thinness,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + partWasteGrams },
     plateTimeSec: fullPlateTime,
     totals: { materialGrams: (partGrams + partSupportGrams + partWasteGrams) * qty, supportGrams: partSupportGrams * qty, wasteGrams: partWasteGrams * qty, printTimeSec: totalTime, energyKWh: totalEnergy },
@@ -325,6 +327,7 @@ function finalize(a: {
   basis: Estimate['basis']
   tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings
   lines: CostLine[]; warnings: string[]; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean
+  thinness?: { fraction: number; thresholdMm: number; p5: number } | null
   single: { printTimeSec: number; materialGrams: number }; plateTimeSec: number
   totals: Omit<EstimateTotals, 'cost' | 'price' | 'priceWithVat'>
   materialVolumeMm3: number; layerCount: number; breakdown: Record<string, number>
@@ -366,6 +369,7 @@ function finalize(a: {
   const footprintMin = Math.min(stats.size.x, stats.size.y)
   if (footprintMin > 0 && stats.size.z / footprintMin > 4 && stats.bedContactArea < 0.25 * stats.size.x * stats.size.y) warnings.push(t('cost.warn.tipOver', { r: (stats.size.z / footprintMin).toFixed(1) }))
   if (stats.bedContactArea < 1 && a.tech === 'fdm') warnings.push(t('cost.warn.noBedContact'))
+  if (a.thinness && a.thinness.fraction >= 0.03) warnings.push(t('cost.warn.thinWalls', { pct: Math.round(a.thinness.fraction * 100), th: a.thinness.thresholdMm.toFixed(1), p5: a.thinness.p5.toFixed(2) }))
   if (stats.layers.coarsened) warnings.push(t('cost.warn.coarsened'))
 
   const total: EstimateTotals = { ...a.totals, cost, price, priceWithVat }

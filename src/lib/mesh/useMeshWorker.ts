@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_PLACEMENT, type MeshStats, type Placement, type WorkerRequest, type WorkerResponse } from './types.ts'
+import { DEFAULT_PLACEMENT, type MeshStats, type Placement, type ThicknessData, type WorkerRequest, type WorkerResponse } from './types.ts'
 import type { Translate } from '../cost/types.ts'
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024 // 200 MB üst sınır
@@ -16,6 +16,7 @@ export interface LoadedModel {
 export interface AnalysisState {
   stats: MeshStats | null
   overhangMask: Uint8Array | null
+  thickness: ThicknessData | null
   placement: Placement
 }
 
@@ -32,6 +33,7 @@ export interface AnalyzeParams {
   overhangThresholdDeg: number
   layerHeight: number
   manifoldCheck: boolean
+  thickness: boolean
 }
 
 export function useMeshWorker(t: Translate) {
@@ -46,7 +48,7 @@ export function useMeshWorker(t: Translate) {
   const pendingPlacement = useRef<Placement | null>(null)
   const [state, setState] = useState<MeshWorkerState>({
     model: null,
-    analysis: { stats: null, overhangMask: null, placement: DEFAULT_PLACEMENT },
+    analysis: { stats: null, overhangMask: null, thickness: null, placement: DEFAULT_PLACEMENT },
     busy: 'idle',
     progress: 0,
     error: null,
@@ -86,7 +88,7 @@ export function useMeshWorker(t: Translate) {
           if (msg.id !== analyzeId.current) return
           setState((s) => ({
             ...s,
-            analysis: { stats: msg.stats, overhangMask: msg.overhangMask, placement: pendingPlacement.current ?? s.analysis.placement },
+            analysis: { stats: msg.stats, overhangMask: msg.overhangMask, thickness: msg.thickness, placement: pendingPlacement.current ?? s.analysis.placement },
             busy: 'idle',
             progress: 1,
             error: null,
@@ -135,7 +137,7 @@ export function useMeshWorker(t: Translate) {
     setState((s) => ({
       ...s,
       model: { fileName: file.name, fileSize: file.size, format: '', triangleCount: 0, positions: new Float32Array(0) },
-      analysis: { ...s.analysis, stats: null, overhangMask: null },
+      analysis: { ...s.analysis, stats: null, overhangMask: null, thickness: null },
       busy: 'reading',
       progress: 0,
       error: null,
@@ -167,7 +169,7 @@ export function useMeshWorker(t: Translate) {
     loadId.current++
     analyzeId.current++
     try { send({ type: 'unload' }) } catch { /* worker yoksa sorun değil */ }
-    setState((s) => ({ ...s, model: null, analysis: { ...s.analysis, stats: null, overhangMask: null }, busy: 'idle', progress: 0, error: null }))
+    setState((s) => ({ ...s, model: null, analysis: { ...s.analysis, stats: null, overhangMask: null, thickness: null }, busy: 'idle', progress: 0, error: null }))
   }, [])
 
   return { ...state, loadFile, analyze, clear }

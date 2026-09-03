@@ -8,6 +8,7 @@ import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
 import { shallowMerge, useLocalStorage } from './lib/useLocalStorage.ts'
 import { normalizeCustomMaterials, normalizeCustomPrinters } from './lib/cost/normalize.ts'
+import { thinFraction, thinMask as buildThinMask } from './lib/mesh/thickness.ts'
 import { FileDrop } from './components/FileDrop.tsx'
 import { makeSamplePawnStl } from './lib/mesh/sample.ts'
 import { Viewer3D } from './components/Viewer3D.tsx'
@@ -38,6 +39,7 @@ export default function App() {
   const [printerId, setPrinterId] = useLocalStorage<string>(LS + 'printerId', DEFAULT_PRINTER_ID)
   const [materialIdByTech, setMaterialIdByTech] = useLocalStorage<Record<string, string>>(LS + 'materialIdByTech', {}, shallowMerge)
   const [manifoldCheck, setManifoldCheck] = useLocalStorage<boolean>(LS + 'manifoldCheck', true)
+  const [thicknessCheck, setThicknessCheck] = useLocalStorage<boolean>(LS + 'thicknessCheck', true)
   // Kullanıcının eklediği yazıcılar: yalnızca bu tarayıcıda (localStorage) saklanır
   const [customPrinters, setCustomPrinters] = useLocalStorage<PrinterProfile[]>(LS + 'customPrinters', [], normalizeCustomPrinters)
   const [customMaterials, setCustomMaterials] = useLocalStorage<Material[]>(LS + 'customMaterials', [], normalizeCustomMaterials)
@@ -146,10 +148,10 @@ export default function App() {
   const modelLoaded = !!mesh.model && mesh.model.positions.length > 0
   useEffect(() => {
     if (!modelLoaded) return
-    const t = setTimeout(() => mesh.analyze({ placement, overhangThresholdDeg, layerHeight, manifoldCheck }), 120)
+    const t = setTimeout(() => mesh.analyze({ placement, overhangThresholdDeg, layerHeight, manifoldCheck, thickness: thicknessCheck }), 120)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelLoaded, placement, overhangThresholdDeg, layerHeight, manifoldCheck])
+  }, [modelLoaded, placement, overhangThresholdDeg, layerHeight, manifoldCheck, thicknessCheck])
 
   const onFile = useCallback(async (file: File) => {
     setPlacement((p) => (p.rotX === 0 && p.rotY === 0 && p.rotZ === 0 && p.unit === 1 && p.scalePct === 100 ? p : DEFAULT_PLACEMENT))
@@ -158,6 +160,11 @@ export default function App() {
   }, [mesh])
 
   const stats = mesh.analysis.stats
+  // Duvar kalınlığı: FDM eşiği 2 hat genişliği (en az 0.8 mm), reçine 0.6 mm
+  const thinThreshold = printer.tech === 'fdm' ? Math.max(0.8, 2 * fdmParams.lineWidth) : 0.6
+  const thickness = mesh.analysis.thickness
+  const thinness = useMemo(() => (thickness && !thickness.skipped && thickness.sampleCount > 0 ? { fraction: thinFraction(thickness, thinThreshold), thresholdMm: thinThreshold, p5: thickness.p5 } : null), [thickness, thinThreshold])
+  const thinMaskArr = useMemo(() => (thickness && !thickness.skipped && stats ? buildThinMask(thickness, thinThreshold, stats.triangleCount) : null), [thickness, thinThreshold, stats])
   const calibration = useMemo(() => (material ? calibrationFactors(calibrations, printer.id, material.id) : null), [calibrations, printer.id, material])
   const slicerOverride = useMemo<SlicerOverride | null>(() => {
     if (!useSlicer || !slicerData || slicerData.printTimeSec == null || slicerData.filamentGrams == null) return null
@@ -168,16 +175,16 @@ export default function App() {
   const modelEstimate = useMemo<Estimate | null>(() => {
     if (!stats || !material) return null
     return printer.tech === 'fdm'
-      ? estimateFdm({ stats, printer, material, settings, params: fdmParams }, t)
-      : estimateResin({ stats, printer, material, settings, params: resinParams }, t)
-  }, [stats, printer, material, settings, fdmParams, resinParams, t])
+      ? estimateFdm({ stats, printer, material, settings, params: fdmParams, thinness }, t)
+      : estimateResin({ stats, printer, material, settings, params: resinParams, thinness }, t)
+  }, [stats, printer, material, settings, fdmParams, resinParams, t, thinness])
   const estimate = useMemo<Estimate | null>(() => {
     if (!stats || !material) return null
     if (!slicerOverride && (!calibration || calibration.samples === 0)) return modelEstimate
     return printer.tech === 'fdm'
-      ? estimateFdm({ stats, printer, material, settings, params: fdmParams, slicer: slicerOverride, calibration }, t)
-      : estimateResin({ stats, printer, material, settings, params: resinParams, calibration }, t)
-  }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration, modelEstimate])
+      ? estimateFdm({ stats, printer, material, settings, params: fdmParams, slicer: slicerOverride, calibration, thinness }, t)
+      : estimateResin({ stats, printer, material, settings, params: resinParams, calibration, thinness }, t)
+  }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration, modelEstimate, thinness])
   // Adet fiyat merdiveni: 1 / 10 / 50 / 100 (+ mevcut adet)
   const ladder = useMemo(() => {
     if (!stats || !material) return []
@@ -271,6 +278,7 @@ export default function App() {
                 <ModelPanel
                   model={mesh.model} stats={stats} placement={placement} onPlacement={setPlacement}
                   manifoldCheck={manifoldCheck} onManifoldCheck={setManifoldCheck} onClear={mesh.clear}
+                  thicknessCheck={thicknessCheck} onThicknessCheck={setThicknessCheck} thickness={thickness} thinness={thinness}
                 />
               </Card>
               <FileDrop onFile={onFile} compact />
@@ -324,6 +332,7 @@ export default function App() {
             <Viewer3D
               positions={modelLoaded ? mesh.model!.positions : null}
               overhangMask={mesh.analysis.overhangMask}
+              thinMask={thinMaskArr}
               placement={stats ? mesh.analysis.placement : placement}
               bboxMin={stats?.min ?? null}
               bboxMax={stats?.max ?? null}
