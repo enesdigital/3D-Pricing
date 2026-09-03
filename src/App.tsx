@@ -350,12 +350,12 @@ export default function App() {
         />
       )}
       <PrinterEditor
-        key={editor.open ? (editor.printer?.id ?? 'new') : 'closed'}
+        key={`printer-${editor.open ? (editor.printer?.id ?? 'new') : 'closed'}`}
         open={editor.open} initial={editor.printer} templates={printers}
         onSave={savePrinter} onDelete={deletePrinter} onClose={() => setEditor({ open: false, printer: null })}
       />
       <MaterialEditor
-        key={matEditor.open ? (matEditor.material?.id ?? 'new') : 'closed'}
+        key={`material-${matEditor.open ? (matEditor.material?.id ?? 'new') : 'closed'}`}
         open={matEditor.open} initial={matEditor.material} templates={materials} defaultTech={printer.tech}
         onSave={saveMaterial} onDelete={deleteMaterial} onClose={() => setMatEditor({ open: false, material: null })}
       />
