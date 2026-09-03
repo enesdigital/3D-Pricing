@@ -50,6 +50,10 @@ export interface MeshStats {
     openEdges: number
     nonManifoldEdges: number
     isClosed: boolean
+    /** Bağlı bileşen (ayrı kabuk) sayısı */
+    components: number
+    /** Aynı yönde iki kez görülen kenar sayısı (tutarsız sarım → hacim güvenilmez) */
+    inconsistentEdges: number
   }
   /** Yüzey normali negatif hacim veriyorsa (ters sarım) */
   invertedWinding: boolean

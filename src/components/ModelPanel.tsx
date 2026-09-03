@@ -51,7 +51,7 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
           <span className={`text-right tabular-nums ${stats.overhangArea > 4 ? 'text-orange-300' : 'text-zinc-200'}`}>{fmt(stats.overhangArea / 100, 1)} cm²</span>
           <span className="text-zinc-500">{t('model.mesh')}</span>
           <span className={`text-right ${stats.manifold.checked ? (stats.manifold.isClosed ? 'text-emerald-300' : 'text-amber-300') : 'text-zinc-500'}`}>
-            {stats.manifold.checked ? (stats.manifold.isClosed ? t('model.closed') : t('model.openEdges', { n: stats.manifold.openEdges })) : t('model.notChecked')}
+            {stats.manifold.checked ? (stats.manifold.isClosed ? t('model.closed') : t('model.openEdges', { n: stats.manifold.openEdges })) : t('model.notChecked')}{stats.manifold.checked && stats.manifold.components > 1 ? ` · ${stats.manifold.components} ${t('model.shells')}` : ''}
           </span>
         </div>
       )}

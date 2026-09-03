@@ -125,7 +125,7 @@ export function analyzeMesh(pos: Float32Array, opts: AnalyzeOptions): AnalyzeRes
   // Footprint: bed'e temas yoksa, tüm yukarı bakan yüzeylerin izdüşümü (üstten görünüm) ≈ ayak izi
   if (footprint <= 0) footprint = horizontal / 2
 
-  let manifold = { checked: false, openEdges: 0, nonManifoldEdges: 0, isClosed: true }
+  let manifold = { checked: false, openEdges: 0, nonManifoldEdges: 0, isClosed: true, components: 1, inconsistentEdges: 0 }
   if (opts.manifoldCheck) {
     manifold = { checked: true, ...checkManifold(pos) }
   }
@@ -159,7 +159,7 @@ export function analyzeMesh(pos: Float32Array, opts: AnalyzeOptions): AnalyzeRes
  * Kenar sayımı ile manifold kontrolü. Köşeler 1e-4 mm ızgarasına yuvarlanarak birleştirilir.
  * Her kenar tam 2 üçgende görünmeli. 1 → açık kenar (delik), >2 → non-manifold.
  */
-export function checkManifold(pos: Float32Array): { openEdges: number; nonManifoldEdges: number; isClosed: boolean } {
+export function checkManifold(pos: Float32Array): { openEdges: number; nonManifoldEdges: number; isClosed: boolean; components: number; inconsistentEdges: number } {
   const triCount = Math.floor(pos.length / 9)
   const vertCount = triCount * 3
   const Q = 1e4 // kuantizasyon (0.0001 mm)
@@ -194,11 +194,21 @@ export function checkManifold(pos: Float32Array): { openEdges: number; nonManifo
   // Kenar anahtarları (min<<24 | max — 2^24 = 16.7M köşe sınırı, double hassasiyetinde güvenli)
   const SHIFT = 16777216 // 2^24
   const edges = new Float64Array(triCount * 3)
+  const directed = new Float64Array(triCount * 3) // yönlü: a<<24 | b — aynı yönlü kenar iki kez → tutarsız sarım
+  // Union-find: bağlı bileşenler
+  const parent = new Int32Array(uniqueCount)
+  for (let i = 0; i < uniqueCount; i++) parent[i] = i
+  const find = (x: number) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+  const union = (a: number, b: number) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb }
   for (let t = 0; t < triCount; t++) {
     const a = ids[t * 3], b = ids[t * 3 + 1], c = ids[t * 3 + 2]
     edges[t * 3] = Math.min(a, b) * SHIFT + Math.max(a, b)
     edges[t * 3 + 1] = Math.min(b, c) * SHIFT + Math.max(b, c)
     edges[t * 3 + 2] = Math.min(c, a) * SHIFT + Math.max(c, a)
+    directed[t * 3] = a * SHIFT + b
+    directed[t * 3 + 1] = b * SHIFT + c
+    directed[t * 3 + 2] = c * SHIFT + a
+    union(a, b); union(b, c)
   }
   edges.sort()
   let open = 0, nonManifold = 0
@@ -211,7 +221,12 @@ export function checkManifold(pos: Float32Array): { openEdges: number; nonManifo
     else if (n > 2) nonManifold++
     i = j
   }
-  return { openEdges: open, nonManifoldEdges: nonManifold, isClosed: open === 0 && nonManifold === 0 }
+  directed.sort()
+  let inconsistent = 0
+  for (let k = 1; k < directed.length; k++) if (directed[k] === directed[k - 1] && directed[k] !== directed[k - 2]) inconsistent++
+  let components = 0
+  for (let v = 0; v < uniqueCount; v++) if (parent[v] === v) components++
+  return { openEdges: open, nonManifoldEdges: nonManifold, isClosed: open === 0 && nonManifold === 0, components, inconsistentEdges: inconsistent }
 }
 
 export function vec3Max(v: Vec3): number { return Math.max(v.x, v.y, v.z) }

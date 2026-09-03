@@ -357,6 +357,15 @@ function finalize(a: {
   if (!fit.fitsRotated) warnings.push(t('cost.warn.noFit', { x: stats.size.x.toFixed(0), y: stats.size.y.toFixed(0), z: stats.size.z.toFixed(0), bx: printer.bed.x, by: printer.bed.y, bz: printer.bed.z }))
   if (stats.manifold.checked && !stats.manifold.isClosed) warnings.push(t('cost.warn.notClosed', { o: stats.manifold.openEdges, nm: stats.manifold.nonManifoldEdges }))
   if (stats.invertedWinding) warnings.push(t('cost.warn.inverted'))
+  // Basılabilirlik (DFM) uyarıları
+  if (stats.manifold.checked && stats.manifold.components > 1) warnings.push(t('cost.warn.components', { n: stats.manifold.components }))
+  if (stats.manifold.checked && stats.manifold.inconsistentEdges > 0) warnings.push(t('cost.warn.inconsistent', { n: stats.manifold.inconsistentEdges }))
+  const maxDim = Math.max(stats.size.x, stats.size.y, stats.size.z)
+  if (maxDim > 0 && maxDim < 5) warnings.push(t('cost.warn.unitSmall', { d: maxDim.toFixed(2) }))
+  if (maxDim > 1500) warnings.push(t('cost.warn.unitLarge', { d: maxDim.toFixed(0) }))
+  const footprintMin = Math.min(stats.size.x, stats.size.y)
+  if (footprintMin > 0 && stats.size.z / footprintMin > 4 && stats.bedContactArea < 0.25 * stats.size.x * stats.size.y) warnings.push(t('cost.warn.tipOver', { r: (stats.size.z / footprintMin).toFixed(1) }))
+  if (stats.bedContactArea < 1 && a.tech === 'fdm') warnings.push(t('cost.warn.noBedContact'))
   if (stats.layers.coarsened) warnings.push(t('cost.warn.coarsened'))
 
   const total: EstimateTotals = { ...a.totals, cost, price, priceWithVat }

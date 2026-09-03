@@ -76,3 +76,23 @@ console.log('7199 s →', formatDuration(7199, t), '| 3599 s →', formatDuratio
   const s = { displayCurrency: 'EUR' as const, fxRates: { EUR: 48, USD: 41, updatedAt: '2026-09-03' } }
   console.log('döviz: 480 ₺ →', fmtMoney(480, s), '| toDisplay', toDisplay(480, s), '| fromDisplay(10)', fromDisplay(10, s), '| TRY', fmtMoney(480, { displayCurrency: 'TRY', fxRates: s.fxRates }))
 }
+
+// Sprint 3a: DFM — ayrı kabuklar ve tutarsız sarım
+{
+  const cube = (ox: number) => { const P=(x:number,y:number,z:number)=>[x+ox,y,z]; const q=(a:number[],b:number[],c:number[],d:number[])=>[...a,...b,...c,...a,...c,...d]; return [
+    ...q(P(0,0,0),P(0,10,0),P(10,10,0),P(10,0,0)), ...q(P(0,0,10),P(10,0,10),P(10,10,10),P(0,10,10)),
+    ...q(P(0,0,0),P(10,0,0),P(10,0,10),P(0,0,10)), ...q(P(10,0,0),P(10,10,0),P(10,10,10),P(10,0,10)),
+    ...q(P(10,10,0),P(0,10,0),P(0,10,10),P(10,10,10)), ...q(P(0,10,0),P(0,0,0),P(0,0,10),P(0,10,10))] }
+  const two = new Float32Array([...cube(0), ...cube(30)])
+  const { stats: s2 } = analyzeMesh(two, { overhangThresholdDeg: 45, manifoldCheck: true, layerHeight: 0.2 })
+  const one = cube(0); const flipped = new Float32Array(one)
+  flipped.set([one[3],one[4],one[5]], 0); flipped.set([one[0],one[1],one[2]], 3)
+  const { stats: s3 } = analyzeMesh(flipped, { overhangThresholdDeg: 45, manifoldCheck: true, layerHeight: 0.2 })
+  const e2 = estimateFdm({ stats: s2, printer: A1, material: mat, settings: DEFAULT_SETTINGS, params: DEFAULT_FDM_PARAMS }, t)
+  const e3 = estimateFdm({ stats: s3, printer: A1, material: mat, settings: DEFAULT_SETTINGS, params: DEFAULT_FDM_PARAMS }, t)
+  console.log('DFM iki küp: components', s2.manifold.components, '| uyarı:', e2.warnings.filter(w => /kabuk/.test(w)).length)
+  console.log('DFM ters üçgen: inconsistentEdges', s3.manifold.inconsistentEdges, '| uyarı:', e3.warnings.filter(w => /tutarsız/.test(w)).length)
+  const tiny = new Float32Array(cube(0).map((v) => v * 0.1))
+  const { stats: s4 } = analyzeMesh(tiny, { overhangThresholdDeg: 45, manifoldCheck: false, layerHeight: 0.2 })
+  console.log('DFM 1 mm küp uyarı (inç?):', estimateFdm({ stats: s4, printer: A1, material: mat, settings: DEFAULT_SETTINGS, params: DEFAULT_FDM_PARAMS }, t).warnings.filter(w => /inç/.test(w)).length)
+}
