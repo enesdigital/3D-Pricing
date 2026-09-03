@@ -12,7 +12,7 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 - Maliyet: malzeme, elektrik, amortisman, bakım, işçilik, başarısızlık riski, kâr marjı, KDV, minimum sipariş, adet
 - Adet girildiğinde tabla bazlı parti hesabı: parçalar tablaya ızgara yerleşimiyle sığdırılır, reçinede süre parça sayısından bağımsız (katman sayısı), FDM'de ısınma/kalibrasyon ve renk değişimleri tabla başına amortize edilir
 - Üç yazıcının aynı model için yan yana karşılaştırması (adet başına ve toplam sipariş fiyatı)
-- Kendi yazıcınızı ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcılar yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
+- Kendi yazıcınızı ve malzemenizi ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcı/malzemeler yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
 - Tüm fiyat/parametreler tarayıcıda (localStorage) saklanır; yazdır / PDF çıktısı
 
 ## Geliştirme

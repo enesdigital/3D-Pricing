@@ -3,7 +3,7 @@ import { PRINTERS } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit } from './lib/cost/engine.ts'
-import type { BusinessSettings, Estimate, FdmPrintParams, PrinterProfile, ResinPrintParams } from './lib/cost/types.ts'
+import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
 import { shallowMerge, useLocalStorage } from './lib/useLocalStorage.ts'
@@ -15,6 +15,7 @@ import { FdmParamsPanel, ResinParamsPanel } from './components/ParamsPanel.tsx'
 import { ResultsPanel } from './components/ResultsPanel.tsx'
 import { SettingsDialog, type PrinterOverride } from './components/SettingsDialog.tsx'
 import { PrinterEditor } from './components/PrinterEditor.tsx'
+import { MaterialEditor } from './components/MaterialEditor.tsx'
 import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
 
 const LS = 'fdm-sla-calc:v1:'
@@ -31,11 +32,13 @@ export default function App() {
   const [manifoldCheck, setManifoldCheck] = useLocalStorage<boolean>(LS + 'manifoldCheck', true)
   // Kullanıcının eklediği yazıcılar: yalnızca bu tarayıcıda (localStorage) saklanır
   const [customPrinters, setCustomPrinters] = useLocalStorage<PrinterProfile[]>(LS + 'customPrinters', [], (st, init) => (Array.isArray(st) ? (st as PrinterProfile[]) : init))
+  const [customMaterials, setCustomMaterials] = useLocalStorage<Material[]>(LS + 'customMaterials', [], (st, init) => (Array.isArray(st) ? (st as Material[]) : init))
 
   // --- Oturum durumu ---
   const [placement, setPlacement] = useState<Placement>(DEFAULT_PLACEMENT)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editor, setEditor] = useState<{ open: boolean; printer: PrinterProfile | null }>({ open: false, printer: null })
+  const [matEditor, setMatEditor] = useState<{ open: boolean; material: Material | null }>({ open: false, material: null })
   const mesh = useMeshWorker()
 
   // Etkin yazıcı / malzeme (override'lar uygulanmış)
@@ -58,7 +61,20 @@ export default function App() {
     if (printerId === id) setPrinterId(PRINTERS[0].id)
     setEditor({ open: false, printer: null })
   }
-  const materials = useMemo(() => MATERIALS.map((m) => ({ ...m, pricePerKgTRY: materialPrices[m.id] ?? m.pricePerKgTRY })), [materialPrices])
+  const materials = useMemo(() => [
+    ...MATERIALS.map((m) => ({ ...m, pricePerKgTRY: materialPrices[m.id] ?? m.pricePerKgTRY })),
+    ...customMaterials,
+  ], [materialPrices, customMaterials])
+  const isCustomMaterial = (id: string) => customMaterials.some((m) => m.id === id)
+  const saveMaterial = (m: Material) => {
+    setCustomMaterials((list) => (list.some((x) => x.id === m.id) ? list.map((x) => (x.id === m.id ? m : x)) : [...list, m]))
+    if (m.tech === printer.tech) setMaterialId(m.id)
+    setMatEditor({ open: false, material: null })
+  }
+  const deleteMaterial = (id: string) => {
+    setCustomMaterials((list) => list.filter((x) => x.id !== id))
+    setMatEditor({ open: false, material: null })
+  }
   const printer = printers.find((p) => p.id === printerId) ?? printers[0]
   const techMaterials = materials.filter((m) => m.tech === printer.tech)
   const material = techMaterials.find((m) => m.id === materialId) ?? techMaterials[0]
@@ -164,8 +180,12 @@ export default function App() {
               </div>
               {printer.notes && <p className="text-[11px] leading-snug text-zinc-500">{printer.notes}</p>}
               <Field label="Malzeme">
-                <Select value={material?.id ?? ''} onChange={setMaterialId} options={techMaterials.map((m) => ({ value: m.id, label: `${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg` }))} />
+                <Select value={material?.id ?? ''} onChange={setMaterialId} options={techMaterials.map((m) => ({ value: m.id, label: `${isCustomMaterial(m.id) ? '★ ' : ''}${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg` }))} />
               </Field>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setMatEditor({ open: true, material: null })}>+ Malzeme ekle</Button>
+                {material && isCustomMaterial(material.id) && <Button variant="ghost" onClick={() => setMatEditor({ open: true, material })}>Düzenle / Sil</Button>}
+              </div>
               <Field label="Adet"><NumberInput value={settings.quantity} onChange={(v) => setSettings({ ...settings, quantity: Math.max(1, Math.round(v)) })} min={1} step={1} /></Field>
             </div>
           </Card>
@@ -274,6 +294,11 @@ export default function App() {
         key={editor.open ? (editor.printer?.id ?? 'new') : 'closed'}
         open={editor.open} initial={editor.printer} templates={printers}
         onSave={savePrinter} onDelete={deletePrinter} onClose={() => setEditor({ open: false, printer: null })}
+      />
+      <MaterialEditor
+        key={matEditor.open ? (matEditor.material?.id ?? 'new') : 'closed'}
+        open={matEditor.open} initial={matEditor.material} templates={materials} defaultTech={printer.tech}
+        onSave={saveMaterial} onDelete={deleteMaterial} onClose={() => setMatEditor({ open: false, material: null })}
       />
       <SettingsDialog
         open={settingsOpen} onClose={() => setSettingsOpen(false)}
