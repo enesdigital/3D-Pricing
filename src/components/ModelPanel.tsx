@@ -1,6 +1,6 @@
-import type { MeshStats, Placement } from '../lib/mesh/types.ts'
+import { effectiveScale, type MeshStats, type Placement } from '../lib/mesh/types.ts'
 import type { LoadedModel } from '../lib/mesh/useMeshWorker.ts'
-import { Button, Toggle } from './ui.tsx'
+import { Button, NumberInput, Toggle } from './ui.tsx'
 
 interface Props {
   model: LoadedModel
@@ -16,7 +16,15 @@ const fmt = (n: number, d = 1) => n.toLocaleString('tr-TR', { maximumFractionDig
 
 export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck, onManifoldCheck, onClear }: Props) {
   const rot = (axis: 'rotX' | 'rotY' | 'rotZ', d: number) => onPlacement({ ...placement, [axis]: ((placement[axis] + d) % 360 + 360) % 360 })
-  const inch = Math.abs(placement.scale - 25.4) < 1e-6
+  const inch = placement.unit === 25.4
+  const scale = effectiveScale(placement)
+  // Ölçeksiz (yalnızca döndürülmüş) boyut: hedef boyut girişleri için
+  const base = stats ? { x: stats.size.x / scale, y: stats.size.y / scale, z: stats.size.z / scale } : null
+  const setPct = (pct: number) => onPlacement({ ...placement, scalePct: Math.max(0.1, Math.min(10000, pct)) })
+  const setTarget = (axis: 'x' | 'y' | 'z', mm: number) => {
+    if (!base || base[axis] <= 0 || mm <= 0) return
+    setPct((mm / (base[axis] * placement.unit)) * 100)
+  }
   return (
     <div className="space-y-3 text-sm">
       <div className="flex items-start justify-between gap-2">
@@ -59,8 +67,22 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
         </div>
       </div>
 
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs font-medium text-zinc-400">Ölçek</span>
+          {placement.scalePct !== 100 && <button className="text-[11px] text-sky-300 hover:underline" onClick={() => setPct(100)}>%100'e dön</button>}
+        </div>
+        <div className="grid grid-cols-4 gap-1">
+          <NumberInput value={Math.round(placement.scalePct * 100) / 100} onChange={setPct} min={0.1} max={10000} step={1} suffix="%" />
+          {(['x', 'y', 'z'] as const).map((a) => (
+            <NumberInput key={a} value={stats ? Math.round(stats.size[a] * 100) / 100 : 0} onChange={(v) => setTarget(a, v)} min={0.01} step={1} suffix={a.toUpperCase()} />
+          ))}
+        </div>
+        <p className="mt-1 text-[11px] text-zinc-500">Bir eksene hedef mm girin; oran korunarak tüm model ölçeklenir.</p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
-        <Toggle checked={inch} onChange={(v) => onPlacement({ ...placement, scale: v ? 25.4 : 1 })} label="Dosya inç birimli" />
+        <Toggle checked={inch} onChange={(v) => onPlacement({ ...placement, unit: v ? 25.4 : 1 })} label="Dosya inç birimli" />
         <Toggle checked={manifoldCheck} onChange={onManifoldCheck} label="Manifold kontrolü" />
       </div>
       <p className="text-[11px] leading-snug text-zinc-500">Renkler: <span className="text-sky-300">mavi</span> normal yüzey, <span className="text-orange-300">turuncu</span> destek gerektiren sarkma, <span className="text-emerald-300">yeşil</span> tabla teması.</p>

@@ -2,6 +2,8 @@ import type { Estimate, Material, PrinterProfile, BusinessSettings } from '../li
 import { fmtTRY, formatDuration } from '../lib/cost/engine.ts'
 import { Stat } from './ui.tsx'
 
+const fmtGrams = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${g.toFixed(0)} g`)
+
 export function ResultsPanel({ est, printer, material, settings }: { est: Estimate; printer: PrinterProfile; material: Material; settings: BusinessSettings }) {
   const qty = Math.max(1, Math.floor(settings.quantity))
   return (
@@ -22,11 +24,23 @@ export function ResultsPanel({ est, printer, material, settings }: { est: Estima
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Malzeme" value={`${est.materialGrams.toFixed(1)} g`} sub={est.supportGrams > 0 ? `destek ${est.supportGrams.toFixed(1)} g` : material.name} />
-        <Stat label="Süre" value={formatDuration(est.printTimeSec)} sub={`${est.layerCount} katman`} />
-        <Stat label="Enerji" value={`${est.energyKWh.toFixed(2)} kWh`} sub={`${printer.spec.avgPowerW} W ort.`} />
-        <Stat label="Hacim" value={`${(est.materialVolumeMm3 / 1000).toFixed(1)} cm³`} sub="basılan malzeme" />
+        <Stat label="Malzeme / adet" value={`${est.materialGrams.toFixed(1)} g`} sub={est.supportGrams > 0 ? `destek ${est.supportGrams.toFixed(1)} g` : material.name} />
+        <Stat label="Süre / adet" value={formatDuration(est.printTimeSec)} sub={`${est.layerCount} katman`} />
+        <Stat label="Enerji / adet" value={`${est.energyKWh.toFixed(2)} kWh`} sub={`${printer.spec.avgPowerW} W ort.`} />
+        <Stat label="Hacim / adet" value={`${(est.materialVolumeMm3 / 1000).toFixed(1)} cm³`} sub="basılan malzeme" />
       </div>
+      {qty > 1 && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">Toplam · {qty} adet</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums sm:grid-cols-4">
+            <div><span className="text-zinc-500">Malzeme</span> <b>{fmtGrams(est.materialGrams * qty)}</b></div>
+            <div><span className="text-zinc-500">Süre</span> <b>{formatDuration(est.printTimeSec * qty)}</b></div>
+            <div><span className="text-zinc-500">Enerji</span> <b>{(est.energyKWh * qty).toFixed(2)} kWh</b></div>
+            <div><span className="text-zinc-500">Maliyet</span> <b>{fmtTRY(est.costPerUnit * qty)}</b></div>
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-500">Her adet ayrı iş olarak hesaplanır (ısınma, hazırlık ve işçilik dahil). Aynı tablada birden fazla parça basılırsa gerçek süre/maliyet daha düşük olur.</p>
+        </div>
+      )}
 
       <table className="w-full text-sm">
         <tbody>

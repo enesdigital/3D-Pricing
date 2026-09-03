@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import type { Placement, Vec3 } from '../lib/mesh/types.ts'
+import { effectiveScale, type Placement, type Vec3 } from '../lib/mesh/types.ts'
 
 interface Props {
   positions: Float32Array | null
@@ -160,7 +160,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     if (!s || !s.mesh) return
     const DEG = Math.PI / 180
     s.mesh.rotation.set(0, 0, 0)
-    s.mesh.scale.setScalar(placement.scale)
+    s.mesh.scale.setScalar(effectiveScale(placement))
     // analyze.ts: R = Rz·Ry·Rx (önce X, sonra Y, sonra Z) → three Euler 'XYZ' aynı sıra
     s.mesh.rotation.set(placement.rotX * DEG, placement.rotY * DEG, placement.rotZ * DEG, 'XYZ')
     if (bboxMin && bboxMax) {

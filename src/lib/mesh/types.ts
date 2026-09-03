@@ -5,8 +5,15 @@ export interface Placement {
   rotX: number
   rotY: number
   rotZ: number
-  scale: number // 1 = mm, 25.4 = inç → mm
+  /** Dosya birimi: 1 = mm, 25.4 = inç */
+  unit: number
+  /** Kullanıcı ölçeği, yüzde (100 = orijinal) */
+  scalePct: number
 }
+
+/** Toplam ölçek çarpanı (birim × yüzde) */
+export const effectiveScale = (p: Placement) => p.unit * (p.scalePct / 100)
+export const DEFAULT_PLACEMENT: Placement = { rotX: 0, rotY: 0, rotZ: 0, unit: 1, scalePct: 100 }
 
 import type { LayerProfile } from './slice.ts'
 

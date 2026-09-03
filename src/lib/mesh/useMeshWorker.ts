@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { MeshStats, Placement, WorkerRequest, WorkerResponse } from './types.ts'
+import { DEFAULT_PLACEMENT, type MeshStats, type Placement, type WorkerRequest, type WorkerResponse } from './types.ts'
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024 // 200 MB üst sınır
 
@@ -42,7 +42,7 @@ export function useMeshWorker() {
   const pendingPlacement = useRef<Placement | null>(null)
   const [state, setState] = useState<MeshWorkerState>({
     model: null,
-    analysis: { stats: null, overhangMask: null, placement: { rotX: 0, rotY: 0, rotZ: 0, scale: 1 } },
+    analysis: { stats: null, overhangMask: null, placement: DEFAULT_PLACEMENT },
     busy: 'idle',
     progress: 0,
     error: null,

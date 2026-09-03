@@ -1,4 +1,4 @@
-import type { MeshStats, Placement, Vec3 } from './types.ts'
+import { effectiveScale, type MeshStats, type Placement, type Vec3 } from './types.ts'
 import { sliceLayers } from './slice.ts'
 
 const DEG = Math.PI / 180
@@ -13,7 +13,7 @@ export function rotationMatrix(p: Placement): Float64Array {
   m[0] = cz * cy;                 m[1] = cz * sy * sx - sz * cx;  m[2] = cz * sy * cx + sz * sx
   m[3] = sz * cy;                 m[4] = sz * sy * sx + cz * cx;  m[5] = sz * sy * cx - cz * sx
   m[6] = -sy;                     m[7] = cy * sx;                 m[8] = cy * cx
-  const s = p.scale
+  const s = effectiveScale(p)
   for (let i = 0; i < 9; i++) m[i] *= s
   return m
 }

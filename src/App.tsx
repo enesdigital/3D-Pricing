@@ -4,7 +4,7 @@ import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit } from './lib/cost/engine.ts'
 import type { BusinessSettings, Estimate, FdmPrintParams, PrinterProfile, ResinPrintParams } from './lib/cost/types.ts'
-import type { Placement } from './lib/mesh/types.ts'
+import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
 import { shallowMerge, useLocalStorage } from './lib/useLocalStorage.ts'
 import { FileDrop } from './components/FileDrop.tsx'
@@ -17,7 +17,6 @@ import { SettingsDialog, type PrinterOverride } from './components/SettingsDialo
 import { Button, Card, Field, NumberInput, Select } from './components/ui.tsx'
 
 const LS = 'fdm-sla-calc:v1:'
-const DEFAULT_PLACEMENT: Placement = { rotX: 0, rotY: 0, rotZ: 0, scale: 1 }
 
 export default function App() {
   // --- Kalıcı ayarlar ---
@@ -61,7 +60,7 @@ export default function App() {
   }, [modelLoaded, placement, overhangThresholdDeg, layerHeight, manifoldCheck])
 
   const onFile = useCallback(async (file: File) => {
-    setPlacement((p) => (p.rotX === 0 && p.rotY === 0 && p.rotZ === 0 && p.scale === 1 ? p : DEFAULT_PLACEMENT))
+    setPlacement((p) => (p.rotX === 0 && p.rotY === 0 && p.rotZ === 0 && p.unit === 1 && p.scalePct === 100 ? p : DEFAULT_PLACEMENT))
     await mesh.loadFile(file)
   }, [mesh])
 
@@ -95,7 +94,7 @@ export default function App() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-2.5">
+        <div className="flex w-full items-center justify-between gap-4 px-4 py-2.5">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-base font-bold">3D</div>
             <div>
@@ -118,7 +117,7 @@ export default function App() {
         )}
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[320px_minmax(0,1fr)_380px]">
+      <main className="grid w-full flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[340px_minmax(0,1fr)_400px] 2xl:grid-cols-[380px_minmax(0,1fr)_460px]">
         {/* Sol: model */}
         <div className="space-y-4">
           {!mesh.model ? (
@@ -157,7 +156,7 @@ export default function App() {
         </div>
 
         {/* Orta: 3B görünüm */}
-        <div className="flex min-h-[420px] flex-col gap-4">
+        <div className="flex min-h-[520px] flex-col gap-4 lg:min-h-[calc(100vh-7rem)]">
           <div className="relative flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
             <Viewer3D
               positions={modelLoaded ? mesh.model!.positions : null}
