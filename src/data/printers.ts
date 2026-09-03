@@ -69,6 +69,64 @@ export const CURATED_PRINTERS: PrinterProfile[] = [
     notes: 'Kapalı, ısıtmalı kasa; çift nozul (ana + yardımcı): 2 renk/malzeme flush olmadan basılır, 3+ renkte AMS purge devreye girer. Çift nozul modunda tabla 235.5×256×256 mm.',
   },
   {
+    id: 'bambu-h2d',
+    name: 'H2D',
+    brand: 'Bambu Lab',
+    tech: 'fdm',
+    bed: { x: 325, y: 320, z: 325 },   // resmi spec: tek nozul 325×320×325; çift nozul 300×320×325; toplam zarf 350×320×325
+    priceTRY: 95060,                    // rhino3dprinter 95 060 / 3dultra 94 850 / metatech 98 951 → medyan (KDV dahil, Eyl 2026)
+    lifetimeHours: 8000,
+    maintenanceTRYPerHour: 5,           // hotend kiti 815 ₺, filtre, plaka
+    spec: {
+      tech: 'fdm',
+      maxFlow: 40,             // resmi: 40 mm³/s standart hotend (65 mm³/s yüksek akışlı hotend ile)
+      efficiencyScale: 1.15,   // 1000 mm/s, 20 000 mm/s², CoreXY
+      outerWallSpeed: 200,
+      layerChangeSec: 1.2,
+      jobOverheadSec: 600,     // kalibrasyon + 65 °C ısıtmalı kasa ön ısıtma
+      jobWasteGrams: 1.5,
+      colorChangeWasteGrams: 0.5, // 3+ renkte aynı nozuldan AMS 2 Pro flush
+      colorChangeTimeSec: 60,
+      nozzleDiameter: 0.4,
+      supportsMultiColor: false,  // AMS dahil değil (Combo sürümüne bakın)
+      dualNozzle: true,           // 2 renk/malzeme nozul değişimiyle, flush yok (prime tower)
+      nozzleSwitchWasteGrams: 0.03,
+      nozzleSwitchTimeSec: 8,
+      avgPowerW: 197,          // Bambu Wiki resmi ölçüm: PLA 197 W, PETG 150 W, PC 395 W; bekleme ~25 W
+      heatupPowerW: 1500,      // nominal 2200 W @220 V
+    },
+    notes: 'Kapalı, 65 °C ısıtmalı kasa; çift nozul (300×320×325 mm çift nozul modunda). 350 °C hotend, mühendislik malzemeleri. Kaynak: Bambu Lab resmi spec, Bambu Wiki güç tablosu; fiyat 3 site medyanı.',
+  },
+  {
+    id: 'bambu-h2d-combo',
+    name: 'H2D Combo',
+    brand: 'Bambu Lab',
+    tech: 'fdm',
+    bed: { x: 325, y: 320, z: 325 },
+    priceTRY: 112800,                   // rhino 113 662 / 3dultra 112 000 / robo90 115 920 / metatech 111 773 → medyan
+    lifetimeHours: 8000,
+    maintenanceTRYPerHour: 5,
+    spec: {
+      tech: 'fdm',
+      maxFlow: 40,
+      efficiencyScale: 1.15,
+      outerWallSpeed: 200,
+      layerChangeSec: 1.2,
+      jobOverheadSec: 600,
+      jobWasteGrams: 1.5,
+      colorChangeWasteGrams: 0.5,
+      colorChangeTimeSec: 60,
+      nozzleDiameter: 0.4,
+      supportsMultiColor: true,   // AMS 2 Pro dahil
+      dualNozzle: true,
+      nozzleSwitchWasteGrams: 0.03,
+      nozzleSwitchTimeSec: 8,
+      avgPowerW: 197,
+      heatupPowerW: 1500,
+    },
+    notes: 'H2D + AMS 2 Pro. Çift nozul: 2 renk flush olmadan; 3+ renkte AMS purge devreye girer. Kaynak: Bambu Lab resmi spec, Bambu Wiki; fiyat 4 site medyanı.',
+  },
+  {
     id: 'elegoo-jupiter-2',
     name: 'Jupiter 2',
     brand: 'Elegoo',
