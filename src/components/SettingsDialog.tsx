@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { BusinessSettings, Material, PrinterProfile } from '../lib/cost/types.ts'
-import { Button, Field, NumberInput } from './ui.tsx'
+import { Button, Field, NumberInput, Select, Toggle } from './ui.tsx'
+import { useState } from 'react'
 import { CalibrationPanel } from './CalibrationPanel.tsx'
 import type { CalibrationRecord, CalibrationFactors } from '../lib/slicer/types.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
@@ -34,8 +35,20 @@ export function SettingsDialog(p: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [p.open, p])
+  const [fxMsg, setFxMsg] = useState<string | null>(null)
   if (!p.open) return null
   const s = p.settings
+  const fetchRates = async () => {
+    try {
+      const r = await fetch('https://api.frankfurter.app/latest?from=TRY&to=EUR,USD')
+      const j = await r.json() as { rates: { EUR: number; USD: number }; date: string }
+      const fx = { EUR: 1 / j.rates.EUR, USD: 1 / j.rates.USD, updatedAt: j.date }
+      p.onSettings({ ...s, fxRates: fx })
+      setFxMsg(t('pricing.ratesUpdated', { date: j.date }))
+    } catch (e) { setFxMsg(t('pricing.ratesError', { e: e instanceof Error ? e.message : String(e) })) }
+  }
+  const tiers = s.discountTiers ?? []
+  const setTier = (i: number, k: 'minQty' | 'pct', v: number) => set('discountTiers', tiers.map((d, j) => (j === i ? { ...d, [k]: v } : d)))
   const set = <K extends keyof BusinessSettings>(k: K, v: BusinessSettings[K]) => p.onSettings({ ...s, [k]: v })
 
   return (
@@ -72,6 +85,54 @@ export function SettingsDialog(p: Props) {
               <Field label={t('settings.plateMargin')}><NumberInput value={s.plateMarginMm} onChange={(v) => set('plateMarginMm', v)} min={0} step={1} suffix="mm" /></Field>
               <Field label={t('settings.resinLiftPenalty')} hint={t('settings.resinLiftPenaltyHint')}><NumberInput value={Math.round(s.resinLiftAreaPenalty * 100)} onChange={(v) => set('resinLiftAreaPenalty', v / 100)} min={0} max={200} step={5} suffix="%" /></Field>
               <Field label={t('settings.timeCalibration')} hint={t('settings.timeCalibrationHint')}><NumberInput value={s.timeMultiplier} onChange={(v) => set('timeMultiplier', v)} min={0.3} max={3} step={0.05} suffix="×" /></Field>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('pricing.secTitle')}</h3>
+            <div className="space-y-4">
+              <div>
+                <div className="mb-1 text-xs text-zinc-400">{t('pricing.tariffPresets')}</div>
+                <div className="flex flex-wrap gap-2">
+                  {([['tariffHome1', 3.25], ['tariffHome2', 5.2], ['tariffBiz', 6.5], ['tariffInd', 5.8]] as const).map(([k, v]) => (
+                    <Button key={k} variant={Math.abs(s.electricityTRYPerKWh - v) < 0.01 ? 'primary' : 'secondary'} onClick={() => set('electricityTRYPerKWh', v)}>{t(`pricing.${k}`)}</Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-zinc-400">{t('pricing.vatPresets')}</span>
+                {[0.2, 0.1, 0.01, 0].map((v) => (
+                  <Button key={v} variant={Math.abs(s.vat - v) < 1e-6 ? 'primary' : 'secondary'} onClick={() => set('vat', v)}>%{Math.round(v * 100)}</Button>
+                ))}
+                <Toggle checked={!!s.showVatIncl} onChange={(v) => set('showVatIncl', v)} label={t('pricing.showVatIncl')} />
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Field label={t('pricing.currency')} hint={t('pricing.currencyHint')}>
+                  <Select value={s.displayCurrency ?? 'TRY'} onChange={(v) => set('displayCurrency', v)} options={[{ value: 'TRY', label: 'TRY ₺' }, { value: 'EUR', label: 'EUR €' }, { value: 'USD', label: 'USD $' }]} />
+                </Field>
+                <Field label={t('pricing.rateEUR')}><NumberInput value={s.fxRates?.EUR ?? 0} onChange={(v) => set('fxRates', { ...(s.fxRates ?? { EUR: 0, USD: 0, updatedAt: '' }), EUR: v })} min={0} step={0.01} suffix="₺" /></Field>
+                <Field label={t('pricing.rateUSD')}><NumberInput value={s.fxRates?.USD ?? 0} onChange={(v) => set('fxRates', { ...(s.fxRates ?? { EUR: 0, USD: 0, updatedAt: '' }), USD: v })} min={0} step={0.01} suffix="₺" /></Field>
+                <div className="flex flex-col justify-end gap-1">
+                  <Button onClick={fetchRates}>{t('pricing.fetchRates')}</Button>
+                  <span className="text-[11px] text-zinc-500">{fxMsg ?? (s.fxRates?.updatedAt ? t('pricing.ratesUpdated', { date: s.fxRates.updatedAt }) : '')}</span>
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-zinc-400">{t('pricing.discountTiers')} <span className="text-zinc-500">· {t('pricing.discountHint')}</span></div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {tiers.map((d, i) => (
+                    <div key={i} className="flex items-center gap-1 rounded-md bg-zinc-950/60 px-2 py-1">
+                      <span className="text-[11px] text-zinc-500">{t('pricing.minQty')}</span>
+                      <NumberInput value={d.minQty} onChange={(v) => setTier(i, 'minQty', Math.max(2, Math.round(v)))} min={2} step={1} className="w-20" />
+                      <NumberInput value={Math.round(d.pct * 100)} onChange={(v) => setTier(i, 'pct', Math.min(0.9, Math.max(0, v / 100)))} min={0} max={90} step={1} suffix="%" className="w-20" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Field label={t('pricing.printerCount')}><NumberInput value={s.printerCount ?? 1} onChange={(v) => set('printerCount', Math.max(1, Math.round(v)))} min={1} step={1} /></Field>
+                <Field label={t('pricing.workHours')} hint={t('pricing.deliveryHint')}><NumberInput value={s.workHoursPerDay ?? 20} onChange={(v) => set('workHoursPerDay', Math.min(24, Math.max(1, v)))} min={1} max={24} step={1} suffix="sa" /></Field>
+              </div>
             </div>
           </section>
 

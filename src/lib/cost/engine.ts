@@ -339,7 +339,14 @@ function finalize(a: {
   if (settings.packagingTRY > 0) lines.push({ key: 'packaging', label: t('cost.lines.packaging'), amount: settings.packagingTRY * qty, detail: qty > 1 ? t('cost.detail.packaging', { qty, try: settings.packagingTRY }) : undefined })
   const cost = lines.reduce((s, l) => s + l.amount, 0)
   let price = cost * (1 + settings.markup)
+  // Kademeli adet indirimi (en yüksek eşleşen kademe)
+  const tier = (settings.discountTiers ?? []).filter((d) => qty >= d.minQty && d.pct > 0).sort((x, y) => y.minQty - x.minQty)[0]
+  const discountPct = tier ? Math.min(0.9, tier.pct) : 0
+  price *= 1 - discountPct
   if (price < settings.minimumPriceTRY) price = settings.minimumPriceTRY
+  // Teslim süresi: toplam makine süresi ÷ (yazıcı × günlük saat) + 1 gün hazırlık/son işlem
+  const capacityH = Math.max(1, settings.printerCount || 1) * Math.max(1, settings.workHoursPerDay || 20)
+  const leadDays = Math.max(1, Math.ceil(a.totals.printTimeSec / 3600 / capacityH) + 1)
   const priceWithVat = price * (1 + settings.vat)
 
   const fit = checkFit(stats, printer)
@@ -361,7 +368,7 @@ function finalize(a: {
   return {
     tech: a.tech, basis: a.basis, quantity: qty, partsPerPlate: a.partsPerPlate, plates: a.plates,
     single: a.single, plateTimeSec: a.plateTimeSec, total, perUnit,
-    materialVolumeMm3: a.materialVolumeMm3, layerCount: a.layerCount,
+    materialVolumeMm3: a.materialVolumeMm3, layerCount: a.layerCount, discountPct, leadDays,
     lines, warnings, fits: fit.fits, fitsRotated: fit.fitsRotated, breakdown: a.breakdown,
   }
 }
@@ -382,3 +389,22 @@ export function formatDurationCompact(sec: number, t: Translate): string {
 
 export const fmtTRY = (n: number) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(n)
+
+type CurrencyOpts = Pick<BusinessSettings, 'displayCurrency' | 'fxRates'>
+/** TRY tutarını gösterim para birimine çevirir (1 birim döviz = fxRates[cur] TRY) */
+export function toDisplay(tryAmount: number, s: CurrencyOpts): number {
+  if (!s.displayCurrency || s.displayCurrency === 'TRY') return tryAmount
+  const rate = s.fxRates?.[s.displayCurrency]
+  return rate && rate > 0 ? tryAmount / rate : tryAmount
+}
+export function fromDisplay(amount: number, s: CurrencyOpts): number {
+  if (!s.displayCurrency || s.displayCurrency === 'TRY') return amount
+  const rate = s.fxRates?.[s.displayCurrency]
+  return rate && rate > 0 ? amount * rate : amount
+}
+/** TRY tutarını gösterim para biriminde biçimlendirir */
+export function fmtMoney(tryAmount: number, s: CurrencyOpts, digits = 2): string {
+  const cur = s.displayCurrency || 'TRY'
+  return new Intl.NumberFormat(cur === 'TRY' ? 'tr-TR' : 'en-US', { style: 'currency', currency: cur, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(toDisplay(tryAmount, s))
+}
+export const currencySymbol = (cur: string) => (cur === 'EUR' ? '€' : cur === 'USD' ? '$' : '₺')

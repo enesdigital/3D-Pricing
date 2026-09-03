@@ -35,7 +35,8 @@ export interface QuoteInput {
 
 export interface QuoteFonts { regular: string; bold: string } // base64 TTF
 
-const money = (n: number) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' ₺'
+import { fmtMoney } from '../cost/engine.ts'
+let money = (n: number) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' ₺'
 const num = (n: number, d = 1) => n.toLocaleString('tr-TR', { maximumFractionDigits: d })
 
 export function quoteFileName(q: QuoteInput, quoteNo: string, t: Translate): string {
@@ -69,6 +70,7 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
   doc.setFont('DejaVu', 'normal')
 
   const { est, stats, printer, material, settings, pricing } = q
+  money = (n: number) => fmtMoney(n, settings)
   const W = doc.internal.pageSize.getWidth()
   const M = 15
   const now = new Date()
@@ -135,6 +137,7 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
     [t('pdf.rowMaterial'), material.name],
     [t('pdf.rowQuality'), quality],
     [t('pdf.rowQuantity'), `${est.quantity}`],
+    [t('pdf.rowDelivery'), t('pdf.deliveryDays', { n: est.leadDays })],
     [t('pdf.rowProduction'), `${t('pdf.machineTime', { dur: formatDuration(est.total.printTimeSec, t) })}${est.plates > 1 ? t('pdf.plates', { n: est.plates }) : ''}`],
   ]
   autoTable(doc, {
@@ -185,6 +188,14 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
     ]
     for (const l of lines) { const wrapped = doc.splitTextToSize(l, W - 2 * M) as string[]; ensure(4.5 * wrapped.length); doc.text(wrapped, M, y); y += 4.5 * wrapped.length }
     doc.setTextColor(0); y += 3
+  }
+
+  // --- İndirim / kur dipnotu ---
+  {
+    const extra: string[] = []
+    if (est.discountPct > 0 && /kâr|margin|marj/i.test(pricing.basis)) extra.push(t('pdf.discountNote', { pct: Math.round(est.discountPct * 100) }))
+    if (settings.displayCurrency && settings.displayCurrency !== 'TRY') extra.push(t('pdf.fxNote', { cur: settings.displayCurrency, rate: (settings.fxRates?.[settings.displayCurrency] ?? 0).toFixed(2), date: settings.fxRates?.updatedAt || '—' }))
+    if (extra.length) { ensure(6 * extra.length); doc.setFontSize(8); doc.setTextColor(90); for (const l of extra) { doc.text(l, M, y); y += 4.5 } doc.setTextColor(0); y += 2 }
   }
 
   // --- Notlar ---

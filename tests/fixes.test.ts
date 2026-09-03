@@ -65,3 +65,14 @@ const mat = MATERIALS.find((m) => m.id === 'pla-bambu')!
 console.log('7199 s →', formatDuration(7199, t), '| 3599 s →', formatDuration(3599, t), '| 29 s →', formatDuration(29, t))
 // reçine regresyon
 { const e = estimateResin({ stats, printer: JUP, material: MATERIALS.find((m) => m.id === 'resin-standard')!, settings: { ...DEFAULT_SETTINGS, quantity: 10 }, params: DEFAULT_RESIN_PARAMS }, t); console.log('reçine 10 adet:', formatDuration(e.total.printTimeSec, t), e.perUnit.price.toFixed(0), '₺/adet') }
+
+// Sprint 2: kademeli indirim, teslim süresi, döviz
+{
+  const { fmtMoney, toDisplay, fromDisplay } = await import('../src/lib/cost/engine.ts')
+  const e1 = estimateFdm({ stats, printer: A1, material: mat, settings: { ...DEFAULT_SETTINGS, quantity: 1 }, params: DEFAULT_FDM_PARAMS }, t)
+  const e50 = estimateFdm({ stats, printer: A1, material: mat, settings: { ...DEFAULT_SETTINGS, quantity: 50 }, params: DEFAULT_FDM_PARAMS }, t)
+  const e50n = estimateFdm({ stats, printer: A1, material: mat, settings: { ...DEFAULT_SETTINGS, quantity: 50, discountTiers: [] }, params: DEFAULT_FDM_PARAMS }, t)
+  console.log('indirim: qty1', e1.discountPct, '| qty50', e50.discountPct, '| fiyat oranı (indirimli/indirimsiz)', (e50.total.price / e50n.total.price).toFixed(3), '| teslim qty1', e1.leadDays, 'gün, qty50', e50.leadDays, 'gün (2 yazıcı:', estimateFdm({ stats, printer: A1, material: mat, settings: { ...DEFAULT_SETTINGS, quantity: 50, printerCount: 2 }, params: DEFAULT_FDM_PARAMS }, t).leadDays, ')')
+  const s = { displayCurrency: 'EUR' as const, fxRates: { EUR: 48, USD: 41, updatedAt: '2026-09-03' } }
+  console.log('döviz: 480 ₺ →', fmtMoney(480, s), '| toDisplay', toDisplay(480, s), '| fromDisplay(10)', fromDisplay(10, s), '| TRY', fmtMoney(480, { displayCurrency: 'TRY', fxRates: s.fxRates }))
+}

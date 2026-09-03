@@ -165,6 +165,17 @@ export interface BusinessSettings {
   resinPerPartMinutes: number
   /** Reçine: tabla kaplama oranı 1.0 iken katman süresine eklenen oran (ayrılma kuvveti için rest/lift yavaşlatma), üst sınır +%30 */
   resinLiftAreaPenalty: number
+  /** Kademeli adet indirimi: adet ≥ minQty ise fiyat × (1 − pct) */
+  discountTiers: { minQty: number; pct: number }[]
+  /** Teslim süresi tahmini: aynı anda çalışan yazıcı sayısı ve günlük çalışma saati */
+  printerCount: number
+  workHoursPerDay: number
+  /** Gösterim para birimi; hesap her zaman TRY, gösterimde kur uygulanır */
+  displayCurrency: 'TRY' | 'EUR' | 'USD'
+  /** 1 birim döviz = kaç TRY */
+  fxRates: { EUR: number; USD: number; updatedAt: string }
+  /** Fiyatları KDV dahil vurgula */
+  showVatIncl: boolean
   /** Teklif PDF'i başlık bilgileri */
   companyName: string
   companyContact: string
@@ -209,6 +220,10 @@ export interface Estimate {
   /** Basılan malzeme hacmi, adet başına mm³ */
   materialVolumeMm3: number
   layerCount: number
+  /** Uygulanan adet indirimi (0..1) */
+  discountPct: number
+  /** Tahmini teslim süresi, iş günü */
+  leadDays: number
   /** Maliyet kalemleri (sipariş toplamı) */
   lines: CostLine[]
   warnings: string[]

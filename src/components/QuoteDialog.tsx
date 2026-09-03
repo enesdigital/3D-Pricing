@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { BusinessSettings, Estimate } from '../lib/cost/types.ts'
 import type { QuoteImage, QuotePricing } from '../lib/pdf/quote.ts'
-import { fmtTRY } from '../lib/cost/engine.ts'
+import { fmtMoney, toDisplay, fromDisplay, currencySymbol } from '../lib/cost/engine.ts'
 import { fileToPngDataUrl, imageSize } from '../lib/pdf/image.ts'
 import { Button, Field, NumberInput, Toggle } from './ui.tsx'
 import { useI18n } from '../lib/i18n/index.tsx'
@@ -29,8 +29,11 @@ export function QuoteDialog(p: Props) {
   const qty = est.quantity
   const [mode, setMode] = useState<Mode>('markup')
   const [markupPct, setMarkupPct] = useState(Math.round(settings.markup * 100))
-  const [unitPrice, setUnitPrice] = useState(Math.round(est.perUnit.price * 100) / 100)
-  const [totalPrice, setTotalPrice] = useState(Math.round(est.total.price * 100) / 100)
+  const fmtTRY = (n: number) => fmtMoney(n, settings)
+  const sym = currencySymbol(settings.displayCurrency ?? 'TRY')
+  // Elle girişler gösterim para birimindedir; hesaba TRY olarak çevrilir
+  const [unitPrice, setUnitPrice] = useState(Math.round(toDisplay(est.perUnit.price, settings) * 100) / 100)
+  const [totalPrice, setTotalPrice] = useState(Math.round(toDisplay(est.total.price, settings) * 100) / 100)
   const [includeProduction, setIncludeProduction] = useState(true)
   const [logoError, setLogoError] = useState<string | null>(null)
 
@@ -45,17 +48,18 @@ export function QuoteDialog(p: Props) {
     let total: number
     let basis: string
     if (mode === 'markup') {
-      total = Math.max(est.total.cost * (1 + markupPct / 100), settings.minimumPriceTRY)
+      // Motorla aynı: marj → kademeli adet indirimi → minimum sipariş
+      total = Math.max(est.total.cost * (1 + markupPct / 100) * (1 - (est.discountPct || 0)), settings.minimumPriceTRY)
       basis = t('quoteDialog.basisMarkup', { pct: markupPct })
     } else if (mode === 'unit') {
-      total = unitPrice * qty
+      total = fromDisplay(unitPrice, settings) * qty
       basis = t('quoteDialog.basisUnit')
     } else {
-      total = totalPrice
+      total = fromDisplay(totalPrice, settings)
       basis = t('quoteDialog.basisTotal')
     }
     return { unitPrice: total / qty, total, vatRate: settings.vat, basis }
-  }, [mode, markupPct, unitPrice, totalPrice, est.total.cost, qty, settings.minimumPriceTRY, settings.vat, t])
+  }, [mode, markupPct, unitPrice, totalPrice, est.total.cost, est.discountPct, qty, settings, t])
 
   if (!p.open) return null
   const margin = pricing.total - est.total.cost
@@ -106,11 +110,11 @@ export function QuoteDialog(p: Props) {
               </div>
               <div className="space-y-1">
                 {radio('unit', t('quoteDialog.modeUnit'))}
-                <NumberInput value={unitPrice} onChange={setUnitPrice} min={0} step={1} suffix="₺" className={mode !== 'unit' ? 'opacity-50' : ''} />
+                <NumberInput value={unitPrice} onChange={setUnitPrice} min={0} step={1} suffix={sym} className={mode !== 'unit' ? 'opacity-50' : ''} />
               </div>
               <div className="space-y-1">
                 {radio('total', t('quoteDialog.modeTotal'))}
-                <NumberInput value={totalPrice} onChange={setTotalPrice} min={0} step={1} suffix="₺" className={mode !== 'total' ? 'opacity-50' : ''} />
+                <NumberInput value={totalPrice} onChange={setTotalPrice} min={0} step={1} suffix={sym} className={mode !== 'total' ? 'opacity-50' : ''} />
               </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm tabular-nums sm:grid-cols-4">

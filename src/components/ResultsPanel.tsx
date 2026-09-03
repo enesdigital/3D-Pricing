@@ -1,11 +1,14 @@
 import type { Estimate, Material, PrinterProfile, BusinessSettings } from '../lib/cost/types.ts'
-import { fmtTRY, formatDuration } from '../lib/cost/engine.ts'
+import { fmtMoney, formatDuration } from '../lib/cost/engine.ts'
 import { Stat } from './ui.tsx'
 import { useI18n } from '../lib/i18n/index.tsx'
 
 const fmtGrams = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${g.toFixed(1)} g`)
 
-export function ResultsPanel({ est, printer, material, settings, calibSamples }: { est: Estimate; printer: PrinterProfile; material: Material; settings: BusinessSettings; calibSamples?: number }) {
+export interface LadderRow { qty: number; unit: number; total: number }
+export function ResultsPanel({ est, printer, material, settings, calibSamples, ladder }: { est: Estimate; printer: PrinterProfile; material: Material; settings: BusinessSettings; calibSamples?: number; ladder?: LadderRow[] }) {
+  const fmtTRY = (n: number) => fmtMoney(n, settings)
+  const vatIncl = !!settings.showVatIncl
   const { t: tr } = useI18n()
   const qty = est.quantity
   const u = est.perUnit
@@ -27,7 +30,7 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples }:
           </div>
         )}
         <div className="text-xs uppercase tracking-wide text-sky-300/80">{tr('results.salePrice')}</div>
-        <div className="mt-1 text-3xl font-bold tabular-nums text-white">{fmtTRY(u.price)}<span className="ml-1 text-sm font-normal text-zinc-400">{tr('results.perUnit')}</span></div>
+        <div className="mt-1 text-3xl font-bold tabular-nums text-white">{fmtTRY(vatIncl ? u.priceWithVat : u.price)}<span className="ml-1 text-sm font-normal text-zinc-400">{tr('results.perUnit')}{vatIncl ? ' · KDV dahil' : ''}</span></div>
         <div className="mt-1 text-sm text-zinc-300">
           {tr('results.vatInclPerUnit', { x: fmtTRY(u.priceWithVat) })}
           {qty > 1 && <> · <b>{tr('results.totalForQty', { qty, t: fmtTRY(t.price) })}</b> {tr('results.vatIncl', { tv: fmtTRY(t.priceWithVat) })}</>}
@@ -37,6 +40,14 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples }:
           {t.price <= settings.minimumPriceTRY + 0.001 ? tr('results.minApplied') : ''}
         </div>
       </div>
+
+      {(est.discountPct > 0 || est.leadDays > 0) && (
+        <div className="flex flex-wrap gap-2 text-xs">
+          {est.discountPct > 0 && <span className="rounded bg-emerald-900/40 px-2 py-1 text-emerald-200">{tr('resultsExtra.discount', { pct: Math.round(est.discountPct * 100) })}</span>}
+          <span className="rounded bg-zinc-800 px-2 py-1 text-zinc-300">{tr('resultsExtra.lead')}: {tr('resultsExtra.leadDays', { n: est.leadDays })}</span>
+          {settings.displayCurrency && settings.displayCurrency !== 'TRY' && <span className="rounded bg-zinc-800 px-2 py-1 text-zinc-400">{tr('resultsExtra.fxNote', { cur: settings.displayCurrency, rate: (settings.fxRates?.[settings.displayCurrency] ?? 0).toFixed(2), date: settings.fxRates?.updatedAt || '—' })}</span>}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label={tr('results.statMaterialPer')} value={fmtGrams(u.materialGrams)} sub={u.supportGrams > 0 ? tr('results.statSupport', { g: u.supportGrams.toFixed(1) }) : material.name} />
@@ -59,6 +70,22 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples }:
             {est.tech === 'resin' ? tr('results.resinNote') : tr('results.fdmNote')}
           </p>
         </div>
+      )}
+
+      {ladder && ladder.length > 1 && (
+        <details className="text-xs text-zinc-400" open>
+          <summary className="cursor-pointer text-zinc-300">{tr('resultsExtra.ladder')}</summary>
+          <table className="mt-1 w-full text-xs">
+            <thead className="text-left text-[11px] uppercase text-zinc-500"><tr><th className="py-1">{tr('resultsExtra.ladderQty')}</th><th className="py-1 text-right">{tr('resultsExtra.ladderUnit')}</th><th className="py-1 text-right">{tr('resultsExtra.ladderTotal')}</th></tr></thead>
+            <tbody>
+              {ladder.map((r) => (
+                <tr key={r.qty} className={`border-t border-zinc-800/80 ${r.qty === est.quantity ? 'text-sky-300' : ''}`}>
+                  <td className="py-1 tabular-nums">{r.qty}</td><td className="py-1 text-right tabular-nums">{fmtTRY(r.unit)}</td><td className="py-1 text-right tabular-nums">{fmtTRY(r.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       )}
 
       <table className="w-full text-sm">

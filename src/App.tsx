@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRINTERS, CURATED_PRINTERS, DEFAULT_PRINTER_ID } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
-import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact } from './lib/cost/engine.ts'
+import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact, fmtMoney } from './lib/cost/engine.ts'
 import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams, Translate } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
@@ -178,6 +178,18 @@ export default function App() {
       ? estimateFdm({ stats, printer, material, settings, params: fdmParams, slicer: slicerOverride, calibration }, t)
       : estimateResin({ stats, printer, material, settings, params: resinParams, calibration }, t)
   }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration, modelEstimate])
+  // Adet fiyat merdiveni: 1 / 10 / 50 / 100 (+ mevcut adet)
+  const ladder = useMemo(() => {
+    if (!stats || !material) return []
+    const qtys = [...new Set([1, 10, 50, 100, Math.max(1, Math.floor(settings.quantity))])].sort((a, b) => a - b)
+    return qtys.map((q) => {
+      const s = { ...settings, quantity: q }
+      const e = printer.tech === 'fdm'
+        ? estimateFdm({ stats, printer, material, settings: s, params: fdmParams, slicer: slicerOverride, calibration }, t)
+        : estimateResin({ stats, printer, material, settings: s, params: resinParams, calibration }, t)
+      return { qty: q, unit: e.perUnit.price, total: e.total.price }
+    })
+  }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration])
   const presetKey = printer.tech === 'fdm' ? `${fdmParams.layerHeight}mm/${Math.round(fdmParams.infillDensity * 100)}%/${fdmParams.wallLoops}w` : `${resinParams.layerHeight}mm`
   const addCalibrationFromSlicer = () => {
     if (!modelEstimate || !material || !slicerOverride || !mesh.model) return
@@ -367,8 +379,8 @@ export default function App() {
                         <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.materialGrams.toFixed(0)} g</td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">{fmtDur(est.total.printTimeSec, t)}</td>
                         {settings.quantity > 1 && <td className="py-1.5 pr-2 text-right tabular-nums text-xs text-zinc-400">{est.plates} × {est.partsPerPlate}</td>}
-                        <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>
-                        {settings.quantity > 1 && <td className="py-1.5 text-right font-semibold tabular-nums">{est.total.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺</td>}
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{fmtMoney(est.perUnit.price, settings, 0)}</td>
+                        {settings.quantity > 1 && <td className="py-1.5 text-right font-semibold tabular-nums">{fmtMoney(est.total.price, settings, 0)}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -392,7 +404,7 @@ export default function App() {
             </div>
           )}>
             {estimate && material ? (
-              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} calibSamples={calibration?.samples} />
+              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} calibSamples={calibration?.samples} ladder={ladder} />
             ) : (
               <div className="text-sm text-zinc-500">
                 {mesh.error ? (

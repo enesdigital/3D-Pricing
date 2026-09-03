@@ -46,6 +46,17 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   fdmPerPartMinutes: 1.5,  // tabladan alma + temizlik
   resinPerPartMinutes: 5,  // destek sökme 2–15 dk (tipik 4–8)
   resinLiftAreaPenalty: 0.15, // T_plate × (1 + 0.15 × kaplama), üst sınır +%30; tilt-release makinelerde 0
+  discountTiers: [
+    { minQty: 10, pct: 0.05 },
+    { minQty: 50, pct: 0.10 },
+    { minQty: 100, pct: 0.15 },
+    { minQty: 500, pct: 0.20 },
+  ],
+  printerCount: 1,
+  workHoursPerDay: 20,
+  displayCurrency: 'TRY',
+  fxRates: { EUR: 48, USD: 41, updatedAt: '' }, // yaklaşık başlangıç değeri; Ayarlar › Kurları güncelle ile çekilir
+  showVatIncl: false,
   companyName: '',
   companyContact: '',
   quoteValidityDays: 15,
