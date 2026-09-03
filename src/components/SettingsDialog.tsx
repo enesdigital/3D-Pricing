@@ -3,6 +3,8 @@ import type { BusinessSettings, Material, PrinterProfile } from '../lib/cost/typ
 import { Button, Field, NumberInput, Select, Toggle } from './ui.tsx'
 import { useState } from 'react'
 import { CalibrationPanel } from './CalibrationPanel.tsx'
+import { downloadText, exportBackup, importBackup } from '../lib/share.ts'
+const LS_PREFIX = 'fdm-sla-calc:v1:'
 import type { CalibrationRecord, CalibrationFactors } from '../lib/slicer/types.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
 
@@ -57,6 +59,15 @@ export function SettingsDialog(p: Props) {
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <h2 className="text-base font-semibold">{t('settings.title')}</h2>
           <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => downloadText(`3d-pricing-ayarlar_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(LS_PREFIX), 'application/json')}>⬇ {t('share.exportBackup')}</Button>
+            <label className="cursor-pointer rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700">
+              ⬆ {t('share.importBackup')}
+              <input type="file" accept=".json,application/json" className="hidden" onChange={async (e) => {
+                const f = e.target.files?.[0]; e.target.value = ''
+                if (!f) return
+                try { const n = importBackup(LS_PREFIX, await f.text()); alert(t('share.importDone', { n })); location.reload() } catch (err) { alert(t('share.importError', { e: err instanceof Error ? err.message : String(err) })) }
+              }} />
+            </label>
             <Button variant="ghost" onClick={p.onReset}>{t('settings.reset')}</Button>
             <Button variant="primary" onClick={p.onClose}>{t('settings.close')}</Button>
           </div>
@@ -148,6 +159,9 @@ export function SettingsDialog(p: Props) {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Field label={t('settings.companyName')} hint={t('settings.companyNameHint')}><input value={s.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder={t('settings.companyNamePlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
               <Field label={t('settings.contact')} hint={t('settings.contactHint')}><input value={s.companyContact} onChange={(e) => set('companyContact', e.target.value)} placeholder={t('settings.contactPlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label={t('share.whatsappNumber')} hint={t('share.whatsappHint')}><input value={s.whatsappNumber ?? ''} onChange={(e) => set('whatsappNumber', e.target.value)} placeholder="+90 5xx xxx xx xx" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label={t('share.websiteUrl')}><input value={s.websiteUrl ?? ''} onChange={(e) => set('websiteUrl', e.target.value)} placeholder="https://" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field>
+              <Field label={t('share.qrTarget')}><Select value={s.qrTarget ?? 'whatsapp'} onChange={(v) => set('qrTarget', v)} options={[{ value: 'none', label: t('share.qrNone') }, { value: 'whatsapp', label: t('share.qrWhatsapp') }, { value: 'website', label: t('share.qrWebsite') }]} /></Field>
               <Field label={t('settings.quoteValidity')}><NumberInput value={s.quoteValidityDays} onChange={(v) => set('quoteValidityDays', Math.max(1, Math.round(v)))} min={1} step={1} suffix={t('units.days')} /></Field>
               <div className="md:col-span-2"><Field label={t('settings.quoteNote')}><textarea value={s.quoteNote} onChange={(e) => set('quoteNote', e.target.value)} rows={2} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" /></Field></div>
             </div>

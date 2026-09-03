@@ -4,6 +4,8 @@ import type { QuoteImage, QuotePricing } from '../lib/pdf/quote.ts'
 import { fmtMoney, toDisplay, fromDisplay, currencySymbol } from '../lib/cost/engine.ts'
 import { fileToPngDataUrl, imageSize } from '../lib/pdf/image.ts'
 import { Button, Field, NumberInput, Toggle } from './ui.tsx'
+import { buildSharedQuote, shareUrl, whatsappUrl, quoteCsv, downloadText } from '../lib/share.ts'
+import type { Material, PrinterProfile } from '../lib/cost/types.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
 
 interface Props {
@@ -18,6 +20,7 @@ interface Props {
   busy: boolean
   error: string | null
   onGenerate: (pricing: QuotePricing, includeProduction: boolean) => void
+  share: { printer: PrinterProfile; material: Material; fileName: string; size: { x: number; y: number; z: number } }
   onClose: () => void
 }
 
@@ -36,6 +39,7 @@ export function QuoteDialog(p: Props) {
   const [totalPrice, setTotalPrice] = useState(Math.round(toDisplay(est.total.price, settings) * 100) / 100)
   const [includeProduction, setIncludeProduction] = useState(true)
   const [logoError, setLogoError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!p.open) return
@@ -156,6 +160,21 @@ export function QuoteDialog(p: Props) {
           </section>
 
           <Toggle checked={includeProduction} onChange={setIncludeProduction} label={t('quoteDialog.includeProduction')} />
+
+          <div className="flex flex-wrap gap-2 border-t border-zinc-800 pt-3">
+            {(() => {
+              const sq = buildSharedQuote({ est, pricing, settings, printer: p.share.printer, material: p.share.material, fileName: p.share.fileName, customer: p.customer, size: p.share.size })
+              const link = shareUrl(sq)
+              const text = t('share.waText', { name: p.customer.trim() ? ` ${p.customer.trim()}` : '', model: sq.model, printer: sq.printer, material: sq.material, qty: sq.qty, unit: fmtTRY(pricing.unitPrice), total: fmtTRY(pricing.total), gross: fmtTRY(pricing.total * (1 + pricing.vatRate)), lead: est.leadDays, link })
+              return (
+                <>
+                  <Button onClick={() => window.open(whatsappUrl(settings.whatsappNumber ?? '', text), '_blank', 'noopener')}>💬 {t('share.whatsapp')}</Button>
+                  <Button onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('URL', link) } }}>🔗 {copied ? t('share.linkCopied') : t('share.copyLink')}</Button>
+                  <Button onClick={() => downloadText(`teklif_${sq.model.replace(/\.[^.]+$/, '')}.csv`, quoteCsv(est, pricing, { model: sq.model, printer: sq.printer, material: sq.material, currency: sq.currency }), 'text/csv')}>📊 {t('share.csv')}</Button>
+                </>
+              )
+            })()}
+          </div>
         </div>
       </div>
     </div>

@@ -216,6 +216,20 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
     doc.setTextColor(0)
   }
 
+  // --- QR kod (WhatsApp / web sitesi) ---
+  const qrTarget = settings.qrTarget === 'whatsapp' && settings.whatsappNumber ? `https://wa.me/${settings.whatsappNumber.replace(/[^\d]/g, '')}` : settings.qrTarget === 'website' && settings.websiteUrl ? settings.websiteUrl : null
+  if (qrTarget) {
+    try {
+      const { toDataURL } = await import('qrcode')
+      const dataUrl = await toDataURL(qrTarget, { margin: 0, width: 256, errorCorrectionLevel: 'M' })
+      doc.setPage(1)
+      doc.addImage(dataUrl, 'PNG', W - M - 18, pageH - 20 - 18, 18, 18)
+      doc.setFontSize(6.5); doc.setTextColor(120)
+      doc.text(settings.qrTarget === 'whatsapp' ? 'WhatsApp' : (settings.websiteUrl ?? '').replace(/^https?:\/\//, '').slice(0, 30), W - M - 9, pageH - 20 + 1.5, { align: 'center' })
+      doc.setTextColor(0)
+    } catch { /* qr başarısızsa sessizce geç */ }
+  }
+
   // --- Altbilgi ---
   const pages = doc.getNumberOfPages()
   for (let i = 1; i <= pages; i++) {

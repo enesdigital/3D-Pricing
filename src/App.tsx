@@ -23,6 +23,8 @@ import { downloadQuotePdf, type QuoteImage, type QuotePricing } from './lib/pdf/
 import { imageSize } from './lib/pdf/image.ts'
 import { QuoteDialog } from './components/QuoteDialog.tsx'
 import { SlicerImport } from './components/SlicerImport.tsx'
+import { SharedQuoteView } from './components/SharedQuoteView.tsx'
+import { readShareFromHash, type SharedQuote } from './lib/share.ts'
 import { calibrationFactors, type CalibrationRecord, type SlicerData, type SlicerOverride } from './lib/slicer/index.ts'
 import { useI18n, LANGS } from './lib/i18n/index.tsx'
 
@@ -50,6 +52,7 @@ export default function App() {
   const [editor, setEditor] = useState<{ open: boolean; printer: PrinterProfile | null }>({ open: false, printer: null })
   const [matEditor, setMatEditor] = useState<{ open: boolean; material: Material | null }>({ open: false, material: null })
   const [customer, setCustomer] = useState('')
+  const [shared, setShared] = useState<SharedQuote | null>(() => readShareFromHash())
   // Dilimleyici verisi ve kalibrasyon
   const [slicerData, setSlicerData] = useState<SlicerData | null>(null)
   const [partsInFile, setPartsInFile] = useState(1)
@@ -446,6 +449,7 @@ export default function App() {
           open={quoteOpen} est={estimate} settings={settings}
           customer={customer} onCustomer={setCustomer}
           logo={logo} onLogo={setLogo} modelImage={modelImage}
+          share={{ printer, material, fileName: mesh.model?.fileName ?? '', size: stats ? stats.size : { x: 0, y: 0, z: 0 } }}
           busy={pdfBusy} error={pdfError}
           onClose={() => setQuoteOpen(false)}
           onGenerate={async (pricing: QuotePricing, includeProduction: boolean) => {
@@ -460,6 +464,7 @@ export default function App() {
           }}
         />
       )}
+      {shared && <SharedQuoteView quote={shared} onClose={() => { setShared(null); history.replaceState(null, '', location.pathname + location.search) }} />}
       <PrinterEditor
         key={`printer-${editor.open ? (editor.printer?.id ?? 'new') : 'closed'}`}
         open={editor.open} initial={editor.printer} templates={printers}

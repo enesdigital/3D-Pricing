@@ -181,6 +181,12 @@ export interface BusinessSettings {
   companyContact: string
   quoteValidityDays: number
   quoteNote: string
+  /** WhatsApp numarası (uluslararası biçim, +90…), teklif paylaşımı ve PDF QR için */
+  whatsappNumber: string
+  /** Web sitesi/adres; PDF QR hedefi */
+  websiteUrl: string
+  /** PDF'teki QR ne göstersin */
+  qrTarget: 'none' | 'whatsapp' | 'website'
 }
 
 export interface CostLine {
