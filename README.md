@@ -12,6 +12,7 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 - Maliyet: malzeme, elektrik, amortisman, bakım, işçilik, başarısızlık riski, kâr marjı, KDV, minimum sipariş, adet
 - Adet girildiğinde tabla bazlı parti hesabı: parçalar tablaya ızgara yerleşimiyle sığdırılır, reçinede süre parça sayısından bağımsız (katman sayısı), FDM'de ısınma/kalibrasyon ve renk değişimleri tabla başına amortize edilir
 - Üç yazıcının aynı model için yan yana karşılaştırması (adet başına ve toplam sipariş fiyatı)
+- Dahili katalog: 4 Türk perakendecisinden (3dultra, robo90, rhino3dprinter, metatechtr) derlenen 160+ FDM/reçine yazıcı ve 390+ filament/reçine (marka + tür bazında, kg fiyatı medyan). `scripts/build-catalog.py` JSON kaynaklarını (`scripts/catalog/`) tekilleştirip `src/data/catalog.ts` üretir; teknik parametreler sınıf sezgileriyle türetilir (elle doğrulanmış 9 profil `printers.ts` içinde önceliklidir)
 - Kendi yazıcınızı ve malzemenizi ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcı/malzemeler yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
 - Müşteriye gönderilebilir **teklif PDF'i**: firma bilgisi ve logo (PNG/JPEG/SVG, tarayıcıda saklanır), 3B görünümden model görseli, kalemsiz fiyat tablosu (kâr marjı ya da elle girilen birim/toplam fiyat), KDV, isteğe bağlı üretim bilgisi; Türkçe karakterler için gömülü DejaVu Sans
 - Tüm fiyat/parametreler tarayıcıda (localStorage) saklanır; yazdır çıktısı

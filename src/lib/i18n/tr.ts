@@ -20,10 +20,11 @@ export const tr = {
     resinSettings: `Baskı ayarları (Reçine)`,
     priceEstimate: `Fiyat tahmini`,
     comparison: `Yazıcı karşılaştırması`,
+    comparisonHint: `Seçilmiş profiller, eklediğiniz yazıcılar ve seçili yazıcı`,
     how: `Nasıl hesaplanıyor?`,
   },
   units: { min: `dk`, days: `gün` },
-  fields: { printer: `Yazıcı`, material: `Malzeme`, quantity: `Adet`, groupFdm: `FDM (filament) yazıcılar`, groupResin: `Reçine (SLA/MSLA) yazıcılar`, groupCustom: `★ Eklediğim yazıcılar` },
+  fields: { printer: `Yazıcı`, material: `Malzeme`, quantity: `Adet`, groupFdm: `FDM (filament) yazıcılar`, groupResin: `Reçine (SLA/MSLA) yazıcılar`, groupCustomMaterial: `★ Eklediğim malzemeler`, groupCustom: `★ Eklediğim yazıcılar` },
   tech: { fdm: `FDM`, resin: `Reçine` },
   actions: {
     addPrinter: `+ Yazıcı ekle`,

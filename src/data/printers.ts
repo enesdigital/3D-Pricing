@@ -1,4 +1,5 @@
 import type { PrinterProfile } from '../lib/cost/types.ts'
+import { CATALOG_PRINTERS } from './catalog.ts'
 
 /**
  * Yazıcı profilleri. Kaynaklar: Bambu Lab resmi spec PDF'leri ve Bambu Wiki güç sayfası,
@@ -7,7 +8,8 @@ import type { PrinterProfile } from '../lib/cost/types.ts'
  * "Efektif akış" değerleri ivme/travel/soğutma kayıplarını içeren ortalama tahminlerdir;
  * Ayarlar > Gelişmiş bölümünden kendi dilimleyici sonuçlarınıza göre kalibre edebilirsiniz.
  */
-export const PRINTERS: PrinterProfile[] = [
+/** Elle doğrulanmış (kaynaklı) profiller; katalogdaki aynı model bunlarla değiştirilmez. */
+export const CURATED_PRINTERS: PrinterProfile[] = [
   {
     id: 'bambu-a1-combo',
     name: 'A1 Combo',
@@ -255,5 +257,22 @@ export const PRINTERS: PrinterProfile[] = [
     notes: 'Kompakt 9K MSLA, tilt-release. Küçük/orta parçalar için popüler. Süre yüksekliğe bağlıdır.',
   },
 ]
+
+/** Katalog betiğiyle (scripts/build-catalog.py) aynı kanonik anahtar: parantez, "AMS", "Original Prusa", CoreXZ vb. yazım farkları yok sayılır. */
+const normKey = (p: PrinterProfile) => `${p.brand} ${p.name}`.toLowerCase()
+  .replace(/\+/g, ' plus ').replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\b(3d|printer|yazici|original prusa|ams|core xz|corexz|quick swap|dual nozzle|idex)\b/g, ' ')
+  .replace(/\bmars 5 ultra 9k\b/, 'mars 5 ultra').replace(/\ba350t\b/, 'a350')
+  .replace(/\s+/g, ' ').trim()
+const curatedKeys = new Set(CURATED_PRINTERS.map(normKey))
+
+/** Tüm dahili yazıcılar: seçilmiş profiller + perakende kataloğu (aynı model tekrar eklenmez). Marka/model sırasıyla. */
+export const PRINTERS: PrinterProfile[] = [
+  ...CURATED_PRINTERS,
+  ...CATALOG_PRINTERS.filter((p) => !curatedKeys.has(normKey(p))),
+].sort((a, b) => a.tech.localeCompare(b.tech) || a.brand.localeCompare(b.brand, 'tr') || a.name.localeCompare(b.name, 'tr', { numeric: true }))
+
+/** Varsayılan seçim: Bambu Lab A1 Combo (seçilmiş listenin ilki) */
+export const DEFAULT_PRINTER_ID = CURATED_PRINTERS[0].id
 
 export const printerById = (id: string) => PRINTERS.find((p) => p.id === id) ?? PRINTERS[0]

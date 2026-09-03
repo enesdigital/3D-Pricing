@@ -22,10 +22,11 @@ export const en: Dict = {
     resinSettings: `Print settings (Resin)`,
     priceEstimate: `Price estimate`,
     comparison: `Printer comparison`,
+    comparisonHint: `Curated profiles, your printers and the selected printer`,
     how: `How is it calculated?`,
   },
   units: { min: `min`, days: `days` },
-  fields: { printer: `Printer`, material: `Material`, quantity: `Quantity`, groupFdm: `FDM (filament) printers`, groupResin: `Resin (SLA/MSLA) printers`, groupCustom: `★ My printers` },
+  fields: { printer: `Printer`, material: `Material`, quantity: `Quantity`, groupFdm: `FDM (filament) printers`, groupResin: `Resin (SLA/MSLA) printers`, groupCustomMaterial: `★ My materials`, groupCustom: `★ My printers` },
   tech: { fdm: `FDM`, resin: `Resin` },
   actions: {
     addPrinter: `+ Add printer`,

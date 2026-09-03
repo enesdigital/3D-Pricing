@@ -78,6 +78,8 @@ export interface PrinterProfile {
 export interface Material {
   id: string
   name: string
+  /** Marka (menü gruplaması için); yoksa adın ilk kelimesi kullanılır */
+  brand?: string
   tech: Tech
   /** g/cm³ */
   density: number

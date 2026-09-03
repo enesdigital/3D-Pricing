@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PRINTERS } from './data/printers.ts'
+import { PRINTERS, CURATED_PRINTERS, DEFAULT_PRINTER_ID } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact } from './lib/cost/engine.ts'
@@ -33,7 +33,7 @@ export default function App() {
   const [printerOverrides, setPrinterOverrides, resetPrinterOverrides] = useLocalStorage<Record<string, PrinterOverride>>(LS + 'printerOverrides', {})
   const [fdmParams, setFdmParams] = useLocalStorage<FdmPrintParams>(LS + 'fdmParams', DEFAULT_FDM_PARAMS, shallowMerge)
   const [resinParams, setResinParams] = useLocalStorage<ResinPrintParams>(LS + 'resinParams', DEFAULT_RESIN_PARAMS, shallowMerge)
-  const [printerId, setPrinterId] = useLocalStorage<string>(LS + 'printerId', PRINTERS[0].id)
+  const [printerId, setPrinterId] = useLocalStorage<string>(LS + 'printerId', DEFAULT_PRINTER_ID)
   const [materialIdByTech, setMaterialIdByTech] = useLocalStorage<Record<string, string>>(LS + 'materialIdByTech', {}, shallowMerge)
   const [manifoldCheck, setManifoldCheck] = useLocalStorage<boolean>(LS + 'manifoldCheck', true)
   // Kullanıcının eklediği yazıcılar: yalnızca bu tarayıcıda (localStorage) saklanır
@@ -92,7 +92,7 @@ export default function App() {
   }
   const deletePrinter = (id: string) => {
     setCustomPrinters((list) => list.filter((x) => x.id !== id))
-    if (printerId === id) setPrinterId(PRINTERS[0].id)
+    if (printerId === id) setPrinterId(DEFAULT_PRINTER_ID)
     setEditor({ open: false, printer: null })
   }
   const materials = useMemo(() => [
@@ -111,6 +111,21 @@ export default function App() {
   }
   const printer = printers.find((p) => p.id === printerId) ?? printers[0]
   const techMaterials = materials.filter((m) => m.tech === printer.tech)
+  const materialGroups = useMemo(() => {
+    const label = (m: Material) => `${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg`
+    const custom = techMaterials.filter((m) => isCustomMaterial(m.id))
+    const rest = techMaterials.filter((m) => !isCustomMaterial(m.id))
+    const byBrand = new Map<string, Material[]>()
+    for (const m of rest) {
+      const brand = m.brand ?? m.name.split(' ')[0]
+      byBrand.set(brand, [...(byBrand.get(brand) ?? []), m])
+    }
+    return [
+      { label: t('fields.groupCustomMaterial'), options: custom.map((m) => ({ value: m.id, label: `★ ${label(m)}` })) },
+      ...[...byBrand.entries()].sort((a, b) => a[0].localeCompare(b[0], 'tr')).map(([brand, ms]) => ({ label: brand, options: ms.map((m) => ({ value: m.id, label: label(m) })) })),
+    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techMaterials, customMaterials, t])
   const materialId = materialIdByTech[printer.tech]
   const material = techMaterials.find((m) => m.id === materialId) ?? techMaterials[0]
   const setMaterialId = useCallback((id: string) => setMaterialIdByTech((m) => ({ ...m, [printer.tech]: id })), [printer.tech, setMaterialIdByTech])
@@ -144,7 +159,10 @@ export default function App() {
   // Tüm yazıcılar için hızlı karşılaştırma
   const comparison = useMemo(() => {
     if (!stats) return []
-    return printers.map((p) => {
+    // Tüm katalog (160+ yazıcı) yerine: seçilmiş profiller + eklediğiniz yazıcılar + seçili yazıcı
+    const curatedIds = new Set(CURATED_PRINTERS.map((p) => p.id))
+    const subset = printers.filter((p) => curatedIds.has(p.id) || isCustom(p.id) || p.id === printer.id)
+    return subset.map((p) => {
       const mats = materials.filter((m) => m.tech === p.tech)
       const m = p.tech === printer.tech && material ? material : mats[0]
       const est = p.tech === 'fdm'
@@ -152,7 +170,8 @@ export default function App() {
         : estimateResin({ stats, printer: p, material: m, settings, params: resinParams }, t)
       return { printer: p, material: m, est }
     })
-  }, [stats, printers, materials, printer.tech, material, settings, fdmParams, resinParams, t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats, printers, materials, printer.id, printer.tech, material, settings, fdmParams, resinParams, t])
 
   const fits = stats ? checkFit(stats, printer).fits : true
   const layout = useMemo(() => {
@@ -229,7 +248,7 @@ export default function App() {
               </div>
               {printer.notes && <p className="text-[11px] leading-snug text-zinc-500">{printer.notes}</p>}
               <Field label={t('fields.material')}>
-                <Select value={material?.id ?? ''} onChange={setMaterialId} options={techMaterials.map((m) => ({ value: m.id, label: `${isCustomMaterial(m.id) ? '★ ' : ''}${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg` }))} />
+                <Select value={material?.id ?? ''} onChange={setMaterialId} groups={materialGroups} />
               </Field>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => setMatEditor({ open: true, material: null })}>{t('actions.addMaterial')}</Button>
@@ -284,7 +303,7 @@ export default function App() {
           </div>
 
           {comparison.length > 0 && (
-            <Card title={t('cards.comparison')}>
+            <Card title={t('cards.comparison')} right={<span className="text-[11px] text-zinc-500">{t('cards.comparisonHint')}</span>}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-[11px] uppercase text-zinc-500">
