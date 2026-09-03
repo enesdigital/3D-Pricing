@@ -399,39 +399,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "ACE Pro · Kaynak: 3dultra.com.tr, robo90.com"
   },
   {
-    "id": "cat-anycubic-kobra-x",
-    "name": "Kobra X",
-    "brand": "Anycubic",
-    "tech": "fdm",
-    "bed": {
-      "x": 260,
-      "y": 260,
-      "z": 260
-    },
-    "priceTRY": 19568,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 28,
-      "efficiencyScale": 0.95,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 300,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": false,
-      "nozzleSwitchWasteGrams": 0,
-      "nozzleSwitchTimeSec": 0,
-      "avgPowerW": 400,
-      "heatupPowerW": 960
-    },
-    "notes": "ACE Gen2 integrated, built-in ACE Gen 2, 4-colour · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
     "id": "cat-artillery-genius-pro",
     "name": "Genius Pro",
     "brand": "Artillery",
@@ -762,105 +729,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "Kaynak: store.metatechtr.com"
   },
   {
-    "id": "cat-bambu-lab-h2c-combo",
-    "name": "H2C Combo",
-    "brand": "Bambu Lab",
-    "tech": "fdm",
-    "bed": {
-      "x": 330,
-      "y": 320,
-      "z": 325
-    },
-    "priceTRY": 132066,
-    "lifetimeHours": 6000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 40,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 180,
-      "heatupPowerW": 800
-    },
-    "notes": "Vortek, Vortek 7-hotend, Vortek, AMS 2 Pro · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
-    "id": "cat-bambu-lab-h2d",
-    "name": "H2D",
-    "brand": "Bambu Lab",
-    "tech": "fdm",
-    "bed": {
-      "x": 350,
-      "y": 320,
-      "z": 325
-    },
-    "priceTRY": 95060,
-    "lifetimeHours": 6000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 40,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 197,
-      "heatupPowerW": 960
-    },
-    "notes": "Kaynak: 3dultra.com.tr, rhino3dprinter.com, store.metatechtr.com"
-  },
-  {
-    "id": "cat-bambu-lab-h2d-combo",
-    "name": "H2D Combo",
-    "brand": "Bambu Lab",
-    "tech": "fdm",
-    "bed": {
-      "x": 350,
-      "y": 320,
-      "z": 325
-    },
-    "priceTRY": 113662,
-    "lifetimeHours": 6000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 40,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.5,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 1050,
-      "heatupPowerW": 960
-    },
-    "notes": "AMS 2 Pro, dual nozzle · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
     "id": "cat-bambu-lab-h2d-pro",
     "name": "H2D Pro",
     "brand": "Bambu Lab",
@@ -892,39 +760,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "heatupPowerW": 960
     },
     "notes": "Kaynak: store.metatechtr.com"
-  },
-  {
-    "id": "cat-bambu-lab-h2d-pro-combo",
-    "name": "H2D Pro Combo",
-    "brand": "Bambu Lab",
-    "tech": "fdm",
-    "bed": {
-      "x": 350,
-      "y": 320,
-      "z": 325
-    },
-    "priceTRY": 208277,
-    "lifetimeHours": 6000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 28,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.5,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 1050,
-      "heatupPowerW": 960
-    },
-    "notes": "Kaynak: 3dultra.com.tr, robo90.com"
   },
   {
     "id": "cat-bambu-lab-h2s",
@@ -2082,39 +1917,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "CFS · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
   },
   {
-    "id": "cat-creality-sparkx-i7-combo",
-    "name": "SPARKX i7 Combo",
-    "brand": "Creality",
-    "tech": "fdm",
-    "bed": {
-      "x": 260,
-      "y": 260,
-      "z": 255
-    },
-    "priceTRY": 21750,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 28,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": false,
-      "nozzleSwitchWasteGrams": 0,
-      "nozzleSwitchTimeSec": 0,
-      "avgPowerW": 130,
-      "heatupPowerW": 560
-    },
-    "notes": "CFS Lite · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
     "id": "cat-elegoo-centauri-2-combo",
     "name": "Centauri 2 Combo",
     "brand": "Elegoo",
@@ -2346,39 +2148,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "Kaynak: 3dultra.com.tr"
   },
   {
-    "id": "cat-elegoo-neptune-4-pro",
-    "name": "Neptune 4 Pro",
-    "brand": "Elegoo",
-    "tech": "fdm",
-    "bed": {
-      "x": 225,
-      "y": 225,
-      "z": 265
-    },
-    "priceTRY": 18337,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 28,
-      "efficiencyScale": 0.95,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 300,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0,
-      "colorChangeTimeSec": 0,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": false,
-      "dualNozzle": false,
-      "nozzleSwitchWasteGrams": 0,
-      "nozzleSwitchTimeSec": 0,
-      "avgPowerW": 110,
-      "heatupPowerW": 280
-    },
-    "notes": "Kaynak: 3dultra.com.tr, store.metatechtr.com"
-  },
-  {
     "id": "cat-elegoo-orangestorm-giga",
     "name": "OrangeStorm Giga",
     "brand": "Elegoo",
@@ -2511,39 +2280,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "AD5X, AD5X, IFS, AD5X, built-in IFS 4-colour · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
   },
   {
-    "id": "cat-flashforge-creator-5",
-    "name": "Creator 5",
-    "brand": "Flashforge",
-    "tech": "fdm",
-    "bed": {
-      "x": 256,
-      "y": 256,
-      "z": 256
-    },
-    "priceTRY": 39500,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 3,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 32,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 130,
-      "heatupPowerW": 560
-    },
-    "notes": "4 toolheads, open frame, 4-toolhead FlashSwap · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
     "id": "cat-flashforge-creator-5-pro",
     "name": "Creator 5 Pro",
     "brand": "Flashforge",
@@ -2575,39 +2311,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "heatupPowerW": 960
     },
     "notes": "4 toolheads, heated chamber, 4-toolhead, heated chamber · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
-    "id": "cat-flashforge-guider-3-ultra",
-    "name": "Guider 3 Ultra",
-    "brand": "Flashforge",
-    "tech": "fdm",
-    "bed": {
-      "x": 330,
-      "y": 330,
-      "z": 600
-    },
-    "priceTRY": 178134,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 28,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 180,
-      "heatupPowerW": 680
-    },
-    "notes": "dual extruder · Kaynak: 3dultra.com.tr, robo90.com"
   },
   {
     "id": "cat-flsun-s1",
@@ -2740,138 +2443,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "heatupPowerW": 320
     },
     "notes": "Kaynak: 3dultra.com.tr"
-  },
-  {
-    "id": "cat-iemai-magic-ht-m",
-    "name": "MAGIC-HT-M",
-    "brand": "IEMAI",
-    "tech": "fdm",
-    "bed": {
-      "x": 220,
-      "y": 220,
-      "z": 220
-    },
-    "priceTRY": 0,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 12,
-      "efficiencyScale": 0.9,
-      "outerWallSpeed": 60,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0,
-      "colorChangeTimeSec": 0,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": false,
-      "dualNozzle": false,
-      "nozzleSwitchWasteGrams": 0,
-      "nozzleSwitchTimeSec": 0,
-      "avgPowerW": 130,
-      "heatupPowerW": 760
-    },
-    "notes": "Kaynak: store.metatechtr.com (fiyat bulunamadı)"
-  },
-  {
-    "id": "cat-iemai-magic-ht-max",
-    "name": "MAGIC-HT-MAX",
-    "brand": "IEMAI",
-    "tech": "fdm",
-    "bed": {
-      "x": 500,
-      "y": 500,
-      "z": 700
-    },
-    "priceTRY": 0,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 5,
-      "efficiencyScale": 0.9,
-      "outerWallSpeed": 60,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 500,
-      "heatupPowerW": 960
-    },
-    "notes": "Kaynak: store.metatechtr.com (fiyat bulunamadı)"
-  },
-  {
-    "id": "cat-iemai-magic-ht-pro",
-    "name": "MAGIC-HT-PRO",
-    "brand": "IEMAI",
-    "tech": "fdm",
-    "bed": {
-      "x": 310,
-      "y": 310,
-      "z": 410
-    },
-    "priceTRY": 0,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 12,
-      "efficiencyScale": 0.9,
-      "outerWallSpeed": 60,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 130,
-      "heatupPowerW": 960
-    },
-    "notes": "Kaynak: store.metatechtr.com (fiyat bulunamadı)"
-  },
-  {
-    "id": "cat-minifactory-ultra-2",
-    "name": "Ultra 2",
-    "brand": "miniFactory",
-    "tech": "fdm",
-    "bed": {
-      "x": 250,
-      "y": 250,
-      "z": 250
-    },
-    "priceTRY": 0,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 2,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 12,
-      "efficiencyScale": 0.9,
-      "outerWallSpeed": 100,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0,
-      "colorChangeTimeSec": 0,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": false,
-      "dualNozzle": false,
-      "nozzleSwitchWasteGrams": 0,
-      "nozzleSwitchTimeSec": 0,
-      "avgPowerW": 130,
-      "heatupPowerW": 800
-    },
-    "notes": "Kaynak: store.metatechtr.com (fiyat bulunamadı)"
   },
   {
     "id": "cat-prusa-original-core-one",
@@ -3468,39 +3039,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "Kaynak: store.metatechtr.com"
   },
   {
-    "id": "cat-raise3d-forge1",
-    "name": "Forge1",
-    "brand": "Raise3D",
-    "tech": "fdm",
-    "bed": {
-      "x": 300,
-      "y": 300,
-      "z": 300
-    },
-    "priceTRY": 911841,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 12,
-      "efficiencyScale": 0.9,
-      "outerWallSpeed": 100,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 180,
-      "heatupPowerW": 800
-    },
-    "notes": "Kaynak: store.metatechtr.com"
-  },
-  {
     "id": "cat-raise3d-pro2",
     "name": "Pro2",
     "brand": "Raise3D",
@@ -3699,39 +3237,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
     "notes": "3-in-1, enclosure, enclosed · Kaynak: 3dultra.com.tr, robo90.com"
   },
   {
-    "id": "cat-snapmaker-artisan",
-    "name": "Artisan",
-    "brand": "Snapmaker",
-    "tech": "fdm",
-    "bed": {
-      "x": 400,
-      "y": 400,
-      "z": 400
-    },
-    "priceTRY": 128553,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 4,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 12,
-      "efficiencyScale": 0.9,
-      "outerWallSpeed": 72,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 180,
-      "heatupPowerW": 800
-    },
-    "notes": "3D module, IDEX, IDEX · Kaynak: 3dultra.com.tr, robo90.com"
-  },
-  {
     "id": "cat-snapmaker-j1s",
     "name": "J1S IDEX",
     "brand": "Snapmaker",
@@ -3763,39 +3268,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "heatupPowerW": 320
     },
     "notes": "Kaynak: 3dultra.com.tr"
-  },
-  {
-    "id": "cat-snapmaker-u1",
-    "name": "U1",
-    "brand": "Snapmaker",
-    "tech": "fdm",
-    "bed": {
-      "x": 270,
-      "y": 270,
-      "z": 270
-    },
-    "priceTRY": 49904,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 3,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 32,
-      "efficiencyScale": 1.0,
-      "outerWallSpeed": 120,
-      "layerChangeSec": 2.0,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0.6,
-      "colorChangeTimeSec": 60,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": true,
-      "dualNozzle": true,
-      "nozzleSwitchWasteGrams": 0.03,
-      "nozzleSwitchTimeSec": 8,
-      "avgPowerW": 130,
-      "heatupPowerW": 920
-    },
-    "notes": "4-toolhead, 4-toolhead toolchanger · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
   },
   {
     "id": "cat-ultimaker-2-plus-connect",
@@ -3928,39 +3400,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "heatupPowerW": 400
     },
     "notes": "Kaynak: store.metatechtr.com"
-  },
-  {
-    "id": "cat-zaxe-x4",
-    "name": "X4",
-    "brand": "Zaxe",
-    "tech": "fdm",
-    "bed": {
-      "x": 250,
-      "y": 250,
-      "z": 260
-    },
-    "priceTRY": 41900,
-    "lifetimeHours": 5000,
-    "maintenanceTRYPerHour": 3,
-    "spec": {
-      "tech": "fdm",
-      "maxFlow": 28,
-      "efficiencyScale": 1.1,
-      "outerWallSpeed": 200,
-      "layerChangeSec": 1.3,
-      "jobOverheadSec": 420,
-      "jobWasteGrams": 1.0,
-      "colorChangeWasteGrams": 0,
-      "colorChangeTimeSec": 0,
-      "nozzleDiameter": 0.4,
-      "supportsMultiColor": false,
-      "dualNozzle": false,
-      "nozzleSwitchWasteGrams": 0,
-      "nozzleSwitchTimeSec": 0,
-      "avgPowerW": 130,
-      "heatupPowerW": 800
-    },
-    "notes": "Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
   },
   {
     "id": "cat-zaxe-z3s",
@@ -4218,34 +3657,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "tiltRelease": true
     },
     "notes": "14K, Wave Release · Kaynak: 3dultra.com.tr, rhino3dprinter.com, robo90.com"
-  },
-  {
-    "id": "cat-creality-halot-max-cl-133",
-    "name": "Halot Max CL-133",
-    "brand": "Creality",
-    "tech": "resin",
-    "bed": {
-      "x": 293,
-      "y": 165,
-      "z": 300
-    },
-    "priceTRY": 46990,
-    "lifetimeHours": 2500,
-    "maintenanceTRYPerHour": 5,
-    "spec": {
-      "tech": "resin",
-      "pixelSizeMm": 0.076,
-      "defaultLayerHeight": 0.05,
-      "exposureSec": 2.5,
-      "bottomExposureSec": 25,
-      "bottomLayers": 6,
-      "liftCycleSec": 7.5,
-      "vatCapacityMl": 500,
-      "avgPowerW": 180,
-      "postPowerW": 50,
-      "tiltRelease": false
-    },
-    "notes": "Kaynak: 3dultra.com.tr, robo90.com"
   },
   {
     "id": "cat-creality-halot-mage-pro-8k",
@@ -4694,34 +4105,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "tiltRelease": true
     },
     "notes": "Kaynak: rhino3dprinter.com, robo90.com"
-  },
-  {
-    "id": "cat-elegoo-saturn-4-ultra-16k",
-    "name": "Saturn 4 Ultra 16K",
-    "brand": "Elegoo",
-    "tech": "resin",
-    "bed": {
-      "x": 218.88,
-      "y": 122.88,
-      "z": 220
-    },
-    "priceTRY": 27005,
-    "lifetimeHours": 2500,
-    "maintenanceTRYPerHour": 5,
-    "spec": {
-      "tech": "resin",
-      "pixelSizeMm": 0.014,
-      "defaultLayerHeight": 0.05,
-      "exposureSec": 2.5,
-      "bottomExposureSec": 25,
-      "bottomLayers": 6,
-      "liftCycleSec": 6.0,
-      "vatCapacityMl": 500,
-      "avgPowerW": 90,
-      "postPowerW": 50,
-      "tiltRelease": true
-    },
-    "notes": "Kaynak: 3dultra.com.tr, robo90.com"
   },
   {
     "id": "cat-formlabs-form-3-plus",
@@ -5226,34 +4609,6 @@ export const CATALOG_PRINTERS: PrinterProfile[] = [
       "tiltRelease": false
     },
     "notes": "dental · Kaynak: 3dultra.com.tr"
-  },
-  {
-    "id": "cat-prusa-original-sl1",
-    "name": "SL1",
-    "brand": "Prusa",
-    "tech": "resin",
-    "bed": {
-      "x": 120,
-      "y": 68,
-      "z": 150
-    },
-    "priceTRY": 122962,
-    "lifetimeHours": 2500,
-    "maintenanceTRYPerHour": 5,
-    "spec": {
-      "tech": "resin",
-      "pixelSizeMm": 0.047,
-      "defaultLayerHeight": 0.05,
-      "exposureSec": 2.5,
-      "bottomExposureSec": 25,
-      "bottomLayers": 6,
-      "liftCycleSec": 6.0,
-      "vatCapacityMl": 500,
-      "avgPowerW": 54,
-      "postPowerW": 50,
-      "tiltRelease": true
-    },
-    "notes": "Kaynak: store.metatechtr.com"
   },
   {
     "id": "cat-shining-3d-accufab-l4k",
@@ -5885,18 +5240,6 @@ export const CATALOG_MATERIALS: Material[] = [
     "minLayerTime": 6,
     "powerFactor": 1.0,
     "notes": "Kaynak: 3dultra.com.tr"
-  },
-  {
-    "id": "cat-f-creality-abs-cr-abs",
-    "name": "Creality ABS (CR-ABS)",
-    "brand": "Creality",
-    "tech": "fdm",
-    "density": 1.04,
-    "pricePerKgTRY": 766,
-    "maxFlow": 16,
-    "minLayerTime": 12,
-    "powerFactor": 1.9,
-    "notes": "Kaynak: rhino3dprinter.com, robo90.com"
   },
   {
     "id": "cat-f-creality-abs-hyper-abs",
@@ -9367,18 +8710,6 @@ export const CATALOG_MATERIALS: Material[] = [
     "notes": "Kaynak: 3dultra.com.tr"
   },
   {
-    "id": "cat-r-elegoo-abs-like",
-    "name": "Elegoo ABS-like",
-    "brand": "Elegoo",
-    "tech": "resin",
-    "density": 1.12,
-    "pricePerKgTRY": 1630,
-    "maxFlow": 0,
-    "minLayerTime": 0,
-    "powerFactor": 1.0,
-    "notes": "Kaynak: 3dultra.com.tr, store.metatechtr.com"
-  },
-  {
     "id": "cat-r-elegoo-abs-like-0-5-kg",
     "name": "Elegoo ABS-like (0.5 kg)",
     "brand": "Elegoo",
@@ -9523,18 +8854,6 @@ export const CATALOG_MATERIALS: Material[] = [
     "notes": "Kaynak: 3dultra.com.tr, store.metatechtr.com"
   },
   {
-    "id": "cat-r-elegoo-standard",
-    "name": "Elegoo Standard",
-    "brand": "Elegoo",
-    "tech": "resin",
-    "density": 1.1,
-    "pricePerKgTRY": 720,
-    "maxFlow": 0,
-    "minLayerTime": 0,
-    "powerFactor": 1.0,
-    "notes": "Kaynak: 3dultra.com.tr, rhino3dprinter.com, store.metatechtr.com"
-  },
-  {
     "id": "cat-r-elegoo-standard-2-kg",
     "name": "Elegoo standard (2 kg)",
     "brand": "Elegoo",
@@ -9617,18 +8936,6 @@ export const CATALOG_MATERIALS: Material[] = [
     "minLayerTime": 0,
     "powerFactor": 1.0,
     "notes": "Kaynak: store.metatechtr.com"
-  },
-  {
-    "id": "cat-r-elegoo-water-washable",
-    "name": "Elegoo Water-washable",
-    "brand": "Elegoo",
-    "tech": "resin",
-    "density": 1.13,
-    "pricePerKgTRY": 1500,
-    "maxFlow": 0,
-    "minLayerTime": 0,
-    "powerFactor": 1.0,
-    "notes": "Kaynak: 3dultra.com.tr, robo90.com, store.metatechtr.com"
   },
   {
     "id": "cat-r-heygears-ultraprint-pac10-castable",

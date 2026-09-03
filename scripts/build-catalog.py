@@ -129,11 +129,35 @@ def resin_spec(specs):
         'tiltRelease': tilt,
     }
 
+UNSURE_RE = re.compile(r'assum|not stated|not confidently|quote only|quote-only|data error|ignored|discrepan|conflict|legacy|listed at 0|no published|not found', re.I)
+
+def conflicts(e):
+    """Kaynaklar arasında çelişki: teknoloji, tabla (>%3), fiyat (>%40), kasa/kinematik; ya da ajan notunda belirsizlik."""
+    s = e['specs']; reasons = []
+    for k in ('bedX_mm', 'bedY_mm', 'bedZ_mm'):
+        v = [x[k] for x in s if isinstance(x.get(k), (int, float)) and x[k] > 0]
+        if v and max(v) / min(v) > 1.03: reasons.append(f'{k}: {sorted(set(v))}')
+    pr = [x for x in e['prices'] if x and x > 0]
+    if len(pr) > 1 and max(pr) / min(pr) > 1.4: reasons.append(f'fiyat: {sorted(round(x) for x in pr)}')
+    for k in ('enclosed', 'dualNozzleOrIdex'):
+        v = {x[k] for x in s if isinstance(x.get(k), bool)}
+        if len(v) > 1: reasons.append(f'{k}: çelişkili')
+    kin = {x['kinematics'] for x in s if x.get('kinematics') in ('bedslinger', 'corexy', 'delta')}
+    if len(kin) > 1: reasons.append(f'kinematik: {sorted(kin)}')
+    notes = ' '.join(str(x.get('notes') or x.get('note') or '') for x in s)
+    m = UNSURE_RE.search(notes)
+    if m: reasons.append(f'not: …{notes[max(0, m.start()-25):m.end()+25].strip()}…')
+    return reasons
+
 out_printers = []
+dropped = []
 for key, e in sorted(printers.items(), key=lambda kv: (kv[1]['tech'], kv[1]['brand'].lower(), kv[1]['model'].lower())):
     s = e['specs']; price = median(e['prices'])
     bed = [first(s, 'bedX_mm'), first(s, 'bedY_mm'), first(s, 'bedZ_mm')]
-    if not all(bed): continue
+    if not all(bed): dropped.append((e['brand'], e['model'], 'tabla ölçüsü yok')); continue
+    if not price: dropped.append((e['brand'], e['model'], 'fiyat yok')); continue
+    why = conflicts(e)
+    if why: dropped.append((e['brand'], e['model'], '; '.join(why))); continue
     spec = fdm_spec(s, price) if e['tech'] == 'fdm' else resin_spec(s)
     clean_name = re.sub(r'\s*\*[^*]*\*', '', re.sub(r'\s*\([^)]*\)', '', e['model'])).strip() or e['model']
     clean_name = re.sub(r'\bAMS Combo\b', 'Combo', clean_name)
@@ -145,7 +169,7 @@ for key, e in sorted(printers.items(), key=lambda kv: (kv[1]['tech'], kv[1]['bra
         'bed': {'x': bed[0], 'y': bed[1], 'z': bed[2]}, 'priceTRY': price or 0,
         'lifetimeHours': (6000 if e['brand'] in ('Bambu Lab', 'Prusa') else 5000) if e['tech'] == 'fdm' else 2500,
         'maintenanceTRYPerHour': (4 if (price or 0) > 50000 else 3 if (price or 0) > 25000 else 2) if e['tech'] == 'fdm' else 5,
-        'spec': spec, 'notes': (extras + ' · ' if extras else '') + 'Kaynak: ' + ', '.join(sorted(set(e['sites']))) + ('' if price else ' (fiyat bulunamadı)'),
+        'spec': spec, 'notes': (extras + ' · ' if extras else '') + 'Kaynak: ' + ', '.join(sorted(set(e['sites']))),
     })
 
 DENS = {'pla': 1.24, 'pla+': 1.24, 'pla silk': 1.24, 'pla matte': 1.24, 'pla-cf': 1.22, 'petg': 1.27, 'petg-cf': 1.25, 'abs': 1.04, 'asa': 1.07,
@@ -161,10 +185,16 @@ def type_key(t):
             return {'plasilk': 'pla silk', 'plamatte': 'pla matte', 'pa6': 'pa', 'pa12': 'pa'}.get(k, k)
     return 'pla'
 
+def price_conflict(vals):
+    v = [x for x in vals if x and x > 0]
+    return len(v) > 1 and max(v) / min(v) > 1.4
+
 out_materials = []
+dropped_m = []
 for key, e in sorted(filaments.items(), key=lambda kv: (kv[1]['brand'].lower(), kv[1]['type'].lower())):
     ppk = median(e['ppk'])
-    if not ppk: continue
+    if not ppk: dropped_m.append((e['brand'], e['type'], 'fiyat yok')); continue
+    if price_conflict(e['ppk']): dropped_m.append((e['brand'], e['type'], f"fiyat: {sorted(round(x) for x in e['ppk'])}")); continue
     tk = type_key(e['type'])
     out_materials.append({'id': 'cat-f-' + key, 'name': f"{e['brand']} {e['type']}", 'brand': e['brand'], 'tech': 'fdm', 'density': DENS.get(tk, 1.24),
                           'pricePerKgTRY': ppk, 'maxFlow': FLOW.get(tk, 15), 'minLayerTime': MINLT.get(tk, 6), 'powerFactor': POWER.get(tk, 1.0),
@@ -177,7 +207,8 @@ def rdens(t):
     return 1.10
 for key, e in sorted(resins.items(), key=lambda kv: (kv[1]['brand'].lower(), kv[1]['type'].lower())):
     ppk = median(e['ppk'])
-    if not ppk: continue
+    if not ppk: dropped_m.append((e['brand'], e['type'], 'fiyat yok')); continue
+    if price_conflict(e['ppk']): dropped_m.append((e['brand'], e['type'], f"fiyat: {sorted(round(x) for x in e['ppk'])}")); continue
     out_materials.append({'id': 'cat-r-' + key, 'name': f"{e['brand']} {e['type']}", 'brand': e['brand'], 'tech': 'resin', 'density': rdens(e['type']),
                           'pricePerKgTRY': ppk, 'maxFlow': 0, 'minLayerTime': 0, 'powerFactor': 1.0,
                           'notes': 'Kaynak: ' + ', '.join(sorted(set(e['sites'])))})
@@ -187,4 +218,6 @@ ts += "import type { Material, PrinterProfile } from '../lib/cost/types.ts'\n\n"
 ts += "export const CATALOG_PRINTERS: PrinterProfile[] = " + json.dumps(out_printers, ensure_ascii=False, indent=2) + "\n\n"
 ts += "export const CATALOG_MATERIALS: Material[] = " + json.dumps(out_materials, ensure_ascii=False, indent=2) + "\n"
 open(os.path.join(ROOT, 'src/data/catalog.ts'), 'w').write(ts)
+for b, m, why in dropped: print(f"  ATILDI: {b} {m} — {why}")
+for b, m, why in dropped_m: print(f"  ATILDI (malzeme): {b} {m} — {why}")
 print(f"yazıcı {len(out_printers)} (fdm {sum(1 for p in out_printers if p['tech']=='fdm')}, reçine {sum(1 for p in out_printers if p['tech']=='resin')}), malzeme {len(out_materials)}")
