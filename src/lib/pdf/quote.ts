@@ -53,6 +53,11 @@ export async function downloadQuotePdf(q: QuoteInput): Promise<void> {
 
 type WithTable = { lastAutoTable: { finalY: number } }
 
+/** Data URL başlığından jsPDF görsel formatını türetir (logo artık JPEG olabilir). */
+function imgFormat(dataUrl: string): 'PNG' | 'JPEG' {
+  return /^data:image\/jpe?g/i.test(dataUrl) ? 'JPEG' : 'PNG'
+}
+
 /** PDF belgesini oluşturur (test edilebilir; tarayıcı API'si gerektirmez). */
 export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts): Promise<{ doc: JsPdfType; quoteNo: string }> {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
@@ -79,7 +84,7 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts): Promise<{
     const maxW = 45, maxH = 18
     const k = Math.min(maxW / q.logo.w, maxH / q.logo.h)
     const lw = q.logo.w * k, lh = q.logo.h * k
-    doc.addImage(q.logo.dataUrl, 'PNG', M, y, lw, lh)
+    doc.addImage(q.logo.dataUrl, imgFormat(q.logo.dataUrl), M, y, lw, lh)
     textX = M + lw + 5
   }
   doc.setFont('DejaVu', 'bold'); doc.setFontSize(15)
@@ -108,7 +113,7 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts): Promise<{
     const iw = (ih * q.modelImage.w) / q.modelImage.h
     doc.setDrawColor(220); doc.setFillColor(248, 248, 248)
     doc.roundedRect(M, imgTop, imgW, ih + 4, 2, 2, 'FD')
-    doc.addImage(q.modelImage.dataUrl, 'PNG', M + (imgW - iw) / 2, imgTop + 2, iw, ih)
+    doc.addImage(q.modelImage.dataUrl, imgFormat(q.modelImage.dataUrl), M + (imgW - iw) / 2, imgTop + 2, iw, ih)
     imgBottom = imgTop + ih + 4
   }
   const infoX = q.modelImage ? M + imgW + 6 : M

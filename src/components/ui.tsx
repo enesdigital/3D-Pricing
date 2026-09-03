@@ -55,8 +55,8 @@ export function Select<T extends string>({ value, onChange, options, className =
   )
 }
 
-export function Button({ children, onClick, variant = 'secondary', className = '', type = 'button', disabled }: {
-  children: ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; className?: string; type?: 'button' | 'submit'; disabled?: boolean
+export function Button({ children, onClick, variant = 'secondary', className = '', type = 'button', disabled, title, ariaLabel }: {
+  children: ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; className?: string; type?: 'button' | 'submit'; disabled?: boolean; title?: string; ariaLabel?: string
 }) {
   const v = {
     primary: 'bg-sky-600 hover:bg-sky-500 text-white',
@@ -65,7 +65,7 @@ export function Button({ children, onClick, variant = 'secondary', className = '
     danger: 'bg-red-900/50 hover:bg-red-800/60 text-red-200 border border-red-900',
   }[variant]
   return (
-    <button type={type} onClick={onClick} disabled={disabled}
+    <button type={type} onClick={onClick} disabled={disabled} title={title} aria-label={ariaLabel}
       className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${v} ${className}`}>
       {children}
     </button>
