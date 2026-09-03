@@ -41,8 +41,11 @@ export function NumberInput({ value, onChange, min, max, step, suffix, className
   )
 }
 
-export function Select<T extends string>({ value, onChange, options, className = '', ariaLabel, title }: {
-  value: T; onChange: (v: T) => void; options: { value: T; label: string; disabled?: boolean }[]; className?: string; ariaLabel?: string; title?: string
+export interface SelectOption<T extends string> { value: T; label: string; disabled?: boolean }
+export interface SelectGroup<T extends string> { label: string; options: SelectOption<T>[] }
+
+export function Select<T extends string>({ value, onChange, options, groups, className = '', ariaLabel, title }: {
+  value: T; onChange: (v: T) => void; options?: SelectOption<T>[]; groups?: SelectGroup<T>[]; className?: string; ariaLabel?: string; title?: string
 }) {
   return (
     <select
@@ -52,7 +55,12 @@ export function Select<T extends string>({ value, onChange, options, className =
       title={title}
       className={`w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-sky-500 ${className}`}
     >
-      {options.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}
+      {options?.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}
+      {groups?.filter((g) => g.options.length > 0).map((g) => (
+        <optgroup key={g.label} label={g.label}>
+          {g.options.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}
+        </optgroup>
+      ))}
     </select>
   )
 }

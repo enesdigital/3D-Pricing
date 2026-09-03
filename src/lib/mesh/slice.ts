@@ -27,12 +27,13 @@ export function sliceLayers(
   onProgress?: (f: number) => void,
 ): LayerProfile {
   const nTri = Math.floor(pos.length / 9)
-  const height = Math.max(0, maxZ - minZ)
-  let lh = layerHeight
+  const height = Number.isFinite(maxZ - minZ) ? Math.max(0, maxZ - minZ) : 0
+  // Geçersiz katman kalınlığı (0, NaN, negatif) → güvenli varsayılan; aksi halde kabalaştırma döngüsü sonsuza girer.
+  let lh = Number.isFinite(layerHeight) && layerHeight > 0 ? layerHeight : 0.2
   let coarsened = false
   let nLayers = Math.max(1, Math.ceil(height / lh - 1e-6))
   // İş yükü sınırı: üçgen × katman çok büyükse katmanı kabalaştır (tahmin doğruluğu hâlâ yeterli).
-  while (nTri * nLayers > 4e8 && nLayers > 50) {
+  while (nTri * nLayers > 4e8 && nLayers > 50 && lh < height) {
     lh *= 2
     nLayers = Math.max(1, Math.ceil(height / lh - 1e-6))
     coarsened = true
@@ -68,7 +69,7 @@ export function sliceLayers(
   for (let l = 0; l < nLayers; l++) {
     const z = minZ + (l + 0.5) * lh
     // Yeni aktifleşen üçgenleri ekle
-    while (cursor < nTri && zlo[order[cursor]] <= z) {
+    while (cursor < nTri && startLayer[order[cursor]] <= l) {
       if (activeLen === active.length) {
         const bigger = new Int32Array(active.length * 2)
         bigger.set(active); active = bigger

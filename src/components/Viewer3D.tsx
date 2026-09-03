@@ -27,6 +27,7 @@ const MAX_INSTANCES = 400
 
 export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax, bed, fits, copies, layout, captureRef }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
+  const colorVersion = useRef(-1)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
     scene: THREE.Scene
@@ -103,6 +104,12 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
   useEffect(() => {
     const s = sceneRef.current
     if (!s) return
+    for (const child of [...s.bedGroup.children]) {
+      const o = child as THREE.Mesh
+      o.geometry?.dispose?.()
+      const m = o.material as THREE.Material | THREE.Material[] | undefined
+      if (Array.isArray(m)) m.forEach((mm) => mm.dispose()); else m?.dispose?.()
+    }
     s.bedGroup.clear()
     const { x, y, z } = bed
     const grid = new THREE.GridHelper(Math.max(x, y), Math.round(Math.max(x, y) / 10), 0x475569, 0x1f2937)
@@ -131,7 +138,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     s.camera.updateProjectionMatrix()
   }, [bed.x, bed.y, bed.z, fits, bed])
 
-  // Model çizimi
+  // Model geometrisi: yalnızca konumlar değişince yeniden kurulur
   useEffect(() => {
     const s = sceneRef.current
     if (!s) return
@@ -145,10 +152,26 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geo.computeVertexNormals()
-    const colors = new Float32Array(positions.length)
-    const triCount = positions.length / 9
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(positions.length), 3))
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide })
+    const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
+    mesh.count = 1
+    mesh.frustumCulled = false
+    s.modelGroup.add(mesh)
+    s.mesh = mesh
+    colorVersion.current = -1 // renkler yeniden yazılsın
+  }, [positions])
+
+  // Sarkma renkleri: yalnızca renk özniteliği güncellenir (geometri yeniden kurulmaz)
+  useEffect(() => {
+    const s = sceneRef.current
+    if (!s || !s.mesh) return
+    const attr = s.mesh.geometry.getAttribute('color') as THREE.BufferAttribute
+    const colors = attr.array as Float32Array
+    const triCount = colors.length / 9
+    const maskOk = overhangMask && overhangMask.length === triCount ? overhangMask : null
     for (let t = 0; t < triCount; t++) {
-      const m = overhangMask ? overhangMask[t] : 0
+      const m = maskOk ? maskOk[t] : 0
       const c = m === 1 ? COLOR_OVERHANG : m === 2 ? COLOR_BED : COLOR_NORMAL
       for (let k = 0; k < 3; k++) {
         colors[t * 9 + k * 3] = c.r
@@ -156,13 +179,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
         colors[t * 9 + k * 3 + 2] = c.b
       }
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide })
-    const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
-    mesh.count = 1
-    mesh.frustumCulled = false
-    s.modelGroup.add(mesh)
-    s.mesh = mesh
+    attr.needsUpdate = true
   }, [positions, overhangMask])
 
   // Yerleşim: döndürme/ölçek + tabla ızgarası (adet kopyaları) + kamera odağı
@@ -172,7 +189,7 @@ export function Viewer3D({ positions, overhangMask, placement, bboxMin, bboxMax,
     const DEG = Math.PI / 180
     const base = new THREE.Matrix4().compose(
       new THREE.Vector3(0, 0, 0),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(placement.rotX * DEG, placement.rotY * DEG, placement.rotZ * DEG, 'XYZ')),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(placement.rotX * DEG, placement.rotY * DEG, placement.rotZ * DEG, 'ZYX') /* analyze.ts: R = Rz·Ry·Rx */),
       new THREE.Vector3().setScalar(effectiveScale(placement)),
     )
     s.modelGroup.position.set(0, 0, 0)

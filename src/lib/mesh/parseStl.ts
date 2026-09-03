@@ -84,5 +84,7 @@ export function parseAsciiStl(buffer: ArrayBuffer, onProgress?: ProgressFn): Par
 
 export function parseStl(buffer: ArrayBuffer, onProgress?: ProgressFn): ParsedMesh {
   if (buffer.byteLength < 15) throw new Error('Dosya çok küçük; geçerli bir STL değil.')
-  return isAsciiStl(buffer) ? parseAsciiStl(buffer, onProgress) : parseBinaryStl(buffer, onProgress)
+  if (isAsciiStl(buffer)) return parseAsciiStl(buffer, onProgress)
+  if (buffer.byteLength < 84 + 50) throw new Error('Dosya geçerli bir binary STL için çok küçük (başlık + en az bir üçgen gerekir).')
+  return parseBinaryStl(buffer, onProgress)
 }

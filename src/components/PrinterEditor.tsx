@@ -14,16 +14,7 @@ interface Props {
   onClose: () => void
 }
 
-const FDM_DEFAULT: FdmPrinterSpec = {
-  tech: 'fdm', maxFlow: 20, efficiencyScale: 0.9, outerWallSpeed: 150, layerChangeSec: 1.5, jobOverheadSec: 300,
-  jobWasteGrams: 1, colorChangeWasteGrams: 0.5, colorChangeTimeSec: 75, nozzleDiameter: 0.4, supportsMultiColor: false,
-  dualNozzle: false, nozzleSwitchWasteGrams: 0.03, nozzleSwitchTimeSec: 8,
-  avgPowerW: 120, heatupPowerW: 400,
-}
-const RESIN_DEFAULT: ResinPrinterSpec = {
-  tech: 'resin', pixelSizeMm: 0.035, defaultLayerHeight: 0.05, exposureSec: 2.5, bottomExposureSec: 25, bottomLayers: 6,
-  liftCycleSec: 7, vatCapacityMl: 500, avgPowerW: 80, postPowerW: 50, tiltRelease: false,
-}
+import { FDM_SPEC_DEFAULTS as FDM_DEFAULT, RESIN_SPEC_DEFAULTS as RESIN_DEFAULT } from '../lib/cost/normalize.ts'
 
 const blank = (tech: Tech): PrinterProfile => ({
   id: '', name: '', brand: '', tech,
@@ -94,6 +85,8 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
     if (!p.name.trim()) { setError(t('printerEditor.errNameRequired')); return }
     if (p.bed.x <= 0 || p.bed.y <= 0 || p.bed.z <= 0) { setError(t('printerEditor.errBedPositive')); return }
     if (p.priceTRY < 0 || p.lifetimeHours <= 0) { setError(t('printerEditor.errPriceLifetime')); return }
+    const badSpec = Object.entries(p.spec).some(([k, v]) => typeof v === 'number' && (!Number.isFinite(v) || v < 0 || (v === 0 && ['maxFlow', 'efficiencyScale', 'outerWallSpeed', 'pixelSizeMm', 'defaultLayerHeight'].includes(k))))
+    if (badSpec) { setError(t('printerEditor.errSpecInvalid')); return }
     onSave({ ...p, id: p.id || `custom-${Date.now().toString(36)}`, name: p.name.trim(), brand: p.brand.trim() })
   }
 

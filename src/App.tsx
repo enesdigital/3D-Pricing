@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRINTERS } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
-import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing } from './lib/cost/engine.ts'
+import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact } from './lib/cost/engine.ts'
 import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams, Translate } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
 import { shallowMerge, useLocalStorage } from './lib/useLocalStorage.ts'
+import { normalizeCustomMaterials, normalizeCustomPrinters } from './lib/cost/normalize.ts'
 import { FileDrop } from './components/FileDrop.tsx'
 import { makeSamplePawnStl } from './lib/mesh/sample.ts'
 import { Viewer3D } from './components/Viewer3D.tsx'
@@ -33,11 +34,11 @@ export default function App() {
   const [fdmParams, setFdmParams] = useLocalStorage<FdmPrintParams>(LS + 'fdmParams', DEFAULT_FDM_PARAMS, shallowMerge)
   const [resinParams, setResinParams] = useLocalStorage<ResinPrintParams>(LS + 'resinParams', DEFAULT_RESIN_PARAMS, shallowMerge)
   const [printerId, setPrinterId] = useLocalStorage<string>(LS + 'printerId', PRINTERS[0].id)
-  const [materialId, setMaterialId] = useLocalStorage<string>(LS + 'materialId', MATERIALS[0].id)
+  const [materialIdByTech, setMaterialIdByTech] = useLocalStorage<Record<string, string>>(LS + 'materialIdByTech', {}, shallowMerge)
   const [manifoldCheck, setManifoldCheck] = useLocalStorage<boolean>(LS + 'manifoldCheck', true)
   // Kullanıcının eklediği yazıcılar: yalnızca bu tarayıcıda (localStorage) saklanır
-  const [customPrinters, setCustomPrinters] = useLocalStorage<PrinterProfile[]>(LS + 'customPrinters', [], (st, init) => (Array.isArray(st) ? (st as PrinterProfile[]) : init))
-  const [customMaterials, setCustomMaterials] = useLocalStorage<Material[]>(LS + 'customMaterials', [], (st, init) => (Array.isArray(st) ? (st as Material[]) : init))
+  const [customPrinters, setCustomPrinters] = useLocalStorage<PrinterProfile[]>(LS + 'customPrinters', [], normalizeCustomPrinters)
+  const [customMaterials, setCustomMaterials] = useLocalStorage<Material[]>(LS + 'customMaterials', [], normalizeCustomMaterials)
 
   // --- Oturum durumu ---
   const [placement, setPlacement] = useState<Placement>(DEFAULT_PLACEMENT)
@@ -110,11 +111,12 @@ export default function App() {
   }
   const printer = printers.find((p) => p.id === printerId) ?? printers[0]
   const techMaterials = materials.filter((m) => m.tech === printer.tech)
+  const materialId = materialIdByTech[printer.tech]
   const material = techMaterials.find((m) => m.id === materialId) ?? techMaterials[0]
-  useEffect(() => { if (material && material.id !== materialId) setMaterialId(material.id) }, [material, materialId, setMaterialId])
+  const setMaterialId = useCallback((id: string) => setMaterialIdByTech((m) => ({ ...m, [printer.tech]: id })), [printer.tech, setMaterialIdByTech])
 
   // Analiz parametreleri: yazıcı teknolojisine göre
-  const layerHeight = printer.tech === 'fdm' ? fdmParams.layerHeight : resinParams.layerHeight
+  const layerHeight = Math.max(0.01, printer.tech === 'fdm' ? fdmParams.layerHeight : resinParams.layerHeight)
   const overhangThresholdDeg = printer.tech === 'fdm' ? fdmParams.overhangThresholdDeg : resinParams.overhangThresholdDeg
 
   // Model yüklendiğinde / yerleşim, katman, eşik değiştiğinde yeniden analiz (debounce)
@@ -215,7 +217,11 @@ export default function App() {
           <Card title={t('cards.printerMaterial')}>
             <div className="space-y-3">
               <Field label={t('fields.printer')}>
-                <Select value={printer.id} onChange={setPrinterId} options={printers.map((p) => ({ value: p.id, label: `${isCustom(p.id) ? '★ ' : ''}${p.brand} ${p.name} · ${p.tech === 'fdm' ? t('tech.fdm') : t('tech.resin')} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` }))} />
+                <Select value={printer.id} onChange={setPrinterId} groups={[
+                  { label: t('fields.groupCustom'), options: printers.filter((p) => isCustom(p.id)).map((p) => ({ value: p.id, label: `★ ${p.brand} ${p.name} · ${p.tech === 'fdm' ? t('tech.fdm') : t('tech.resin')} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` })) },
+                  { label: t('fields.groupFdm'), options: printers.filter((p) => !isCustom(p.id) && p.tech === 'fdm').map((p) => ({ value: p.id, label: `${p.brand} ${p.name} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` })) },
+                  { label: t('fields.groupResin'), options: printers.filter((p) => !isCustom(p.id) && p.tech === 'resin').map((p) => ({ value: p.id, label: `${p.brand} ${p.name} · ${p.bed.x}×${p.bed.y}×${p.bed.z} mm` })) },
+                ]} />
               </Field>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => setEditor({ open: true, printer: null })}>{t('actions.addPrinter')}</Button>
@@ -229,7 +235,7 @@ export default function App() {
                 <Button onClick={() => setMatEditor({ open: true, material: null })}>{t('actions.addMaterial')}</Button>
                 {material && isCustomMaterial(material.id) && <Button variant="ghost" onClick={() => setMatEditor({ open: true, material })}>{t('actions.editDelete')}</Button>}
               </div>
-              <Field label={t('fields.quantity')}><NumberInput value={settings.quantity} onChange={(v) => setSettings({ ...settings, quantity: Math.max(1, Math.round(v)) })} min={1} step={1} /></Field>
+              <Field label={t('fields.quantity')}><NumberInput value={settings.quantity} onChange={(v) => setSettings({ ...settings, quantity: Math.min(MAX_QUANTITY, Math.max(1, Math.round(v))) })} min={1} max={MAX_QUANTITY} step={1} /></Field>
             </div>
           </Card>
 
@@ -246,7 +252,7 @@ export default function App() {
             <Viewer3D
               positions={modelLoaded ? mesh.model!.positions : null}
               overhangMask={mesh.analysis.overhangMask}
-              placement={placement}
+              placement={stats ? mesh.analysis.placement : placement}
               bboxMin={stats?.min ?? null}
               bboxMax={stats?.max ?? null}
               bed={bedForViewer}
@@ -394,7 +400,4 @@ export default function App() {
   )
 }
 
-function fmtDur(sec: number, t: Translate) {
-  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60)
-  return h ? t('duration.compactHM', { h, m }) : t('duration.compactMin', { m })
-}
+function fmtDur(sec: number, t: Translate) { return formatDurationCompact(sec, t) }

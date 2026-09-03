@@ -25,7 +25,7 @@ export const en: Dict = {
     how: `How is it calculated?`,
   },
   units: { min: `min`, days: `days` },
-  fields: { printer: `Printer`, material: `Material`, quantity: `Quantity` },
+  fields: { printer: `Printer`, material: `Material`, quantity: `Quantity`, groupFdm: `FDM (filament) printers`, groupResin: `Resin (SLA/MSLA) printers`, groupCustom: `★ My printers` },
   tech: { fdm: `FDM`, resin: `Resin` },
   actions: {
     addPrinter: `+ Add printer`,
@@ -237,6 +237,7 @@ export const en: Dict = {
       inverted: `Surface normals appear inverted; volume was taken as absolute value.`,
       coarsened: `Very dense mesh: layer analysis was done with a coarser step.`,
       bigArea: `Very large cross-section area: separation force on the FEP is high; drainage or angled placement is recommended.`,
+      marginTight: `The model only fits the bed without the edge margin ({m} mm); it must be placed flush against the edge.`,
     },
   },
   settings: {
@@ -337,6 +338,7 @@ export const en: Dict = {
     confirmDelete: `Delete "{name}"?`,
     errNameRequired: `Printer name is required.`,
     errBedPositive: `Bed dimensions must be positive.`,
+    errSpecInvalid: `Parameters must be positive numbers (flow, speed, pixel and layer values cannot be zero).`,
     errPriceLifetime: `Price and lifetime must be valid.`,
     fromTemplate: `Start from a template (optional)`,
     fromTemplateHint: `Copies values from a similar printer; you can edit afterwards.`,

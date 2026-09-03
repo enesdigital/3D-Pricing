@@ -93,7 +93,7 @@ export function SettingsDialog(p: Props) {
                       <tr key={pr.id} className="border-t border-zinc-800">
                         <td className="py-1.5 pr-2 whitespace-nowrap">{pr.brand} {pr.name}</td>
                         <td className="py-1.5 pr-2"><NumberInput value={o.priceTRY ?? pr.priceTRY} onChange={(v) => upd('priceTRY', v)} min={0} step={100} className="w-28" /></td>
-                        <td className="py-1.5 pr-2"><NumberInput value={o.lifetimeHours ?? pr.lifetimeHours} onChange={(v) => upd('lifetimeHours', v)} min={100} step={100} className="w-24" /></td>
+                        <td className="py-1.5 pr-2"><NumberInput value={o.lifetimeHours ?? pr.lifetimeHours} onChange={(v) => upd('lifetimeHours', Math.max(100, v))} min={100} step={100} className="w-24" /></td>
                         <td className="py-1.5 pr-2"><NumberInput value={o.maintenanceTRYPerHour ?? pr.maintenanceTRYPerHour} onChange={(v) => upd('maintenanceTRYPerHour', v)} min={0} step={0.5} className="w-24" /></td>
                         <td className="py-1.5"><NumberInput value={o.avgPowerW ?? pr.spec.avgPowerW} onChange={(v) => upd('avgPowerW', v)} min={0} step={5} className="w-24" /></td>
                       </tr>

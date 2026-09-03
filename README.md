@@ -23,7 +23,7 @@ npm install
 npm run dev
 ```
 
-Üretim derlemesi: `npm run build` → `dist/`.
+Üretim derlemesi: `npm run build` → `dist/`. Motor/dilimleyici regresyon testleri: `npm test` (Node 22+, tip sıyırma ile çalışır).
 
 ## Yayınlama
 

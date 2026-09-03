@@ -57,18 +57,19 @@ function detectLang(): Lang {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   // SSR ve ilk render daima 'tr' (layout lang="tr" ile uyumlu); mount sonrası ayarlanır.
-  const [lang, setLangState] = useState<Lang>('tr')
-
-  useEffect(() => {
-    let initial: Lang | null = null
+  // İlk değer istemcide senkron okunur (SSR'da window yok → 'tr'); böylece effect içinde setState gerekmez.
+  const [lang, setLangState] = useState<Lang>(() => {
+    if (typeof window === 'undefined') return 'tr'
     try {
       const saved = localStorage.getItem(LS_LANG)
-      if (saved === 'tr' || saved === 'en') initial = saved
+      if (saved === 'tr' || saved === 'en') return saved
     } catch { /* ignore */ }
-    if (!initial) initial = detectLang()
-    setLangState(initial)
-    try { document.documentElement.setAttribute('lang', initial) } catch { /* ignore */ }
-  }, [])
+    return detectLang()
+  })
+
+  useEffect(() => {
+    try { document.documentElement.setAttribute('lang', lang) } catch { /* ignore */ }
+  }, [lang])
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l)

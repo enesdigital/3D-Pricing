@@ -38,7 +38,7 @@ export function useMeshWorker(t: Translate) {
   const workerRef = useRef<Worker | null>(null)
   // t'nin güncel değerini callback'lerde deps churn'ü olmadan kullanmak için ref
   const tRef = useRef(t)
-  tRef.current = t
+  useEffect(() => { tRef.current = t }, [t])
   // Yükleme ve analiz istekleri ayrı sayaçlarla izlenir; böylece araya giren bir analiz isteği
   // "yüklendi" cevabının yok sayılmasına yol açmaz.
   const loadId = useRef(0)
@@ -95,7 +95,12 @@ export function useMeshWorker(t: Translate) {
         }
         case 'error': {
           // Eski bir isteğin hatası bile olsa göster; kullanıcı ne olduğunu bilmeli.
-          setState((s) => ({ ...s, busy: 'idle', error: msg.message }))
+          // Yükleme sırasında hata: yarım kalan (0 üçgenli) hayalet modeli kaldır.
+          const loadFailed = msg.id === loadId.current
+          setState((s) => ({
+            ...s, busy: 'idle', error: msg.message,
+            model: loadFailed && s.model && s.model.positions.length === 0 ? null : s.model,
+          }))
           return
         }
       }

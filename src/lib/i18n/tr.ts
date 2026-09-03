@@ -23,7 +23,7 @@ export const tr = {
     how: `Nasıl hesaplanıyor?`,
   },
   units: { min: `dk`, days: `gün` },
-  fields: { printer: `Yazıcı`, material: `Malzeme`, quantity: `Adet` },
+  fields: { printer: `Yazıcı`, material: `Malzeme`, quantity: `Adet`, groupFdm: `FDM (filament) yazıcılar`, groupResin: `Reçine (SLA/MSLA) yazıcılar`, groupCustom: `★ Eklediğim yazıcılar` },
   tech: { fdm: `FDM`, resin: `Reçine` },
   actions: {
     addPrinter: `+ Yazıcı ekle`,
@@ -235,6 +235,7 @@ export const tr = {
       inverted: `Yüzey normalleri ters görünüyor; hacim mutlak değer olarak alındı.`,
       coarsened: `Çok yoğun mesh: katman analizi daha kaba adımla yapıldı.`,
       bigArea: `Çok büyük kesit alanı: FEP üzerindeki ayrılma kuvveti yüksek; boşaltma veya açılı yerleşim önerilir.`,
+      marginTight: `Model tablaya ancak kenar payı ({m} mm) olmadan sığıyor; yerleşimde kenara dayalı basılması gerekir.`,
     },
   },
   settings: {
@@ -335,6 +336,7 @@ export const tr = {
     confirmDelete: `"{name}" silinsin mi?`,
     errNameRequired: `Yazıcı adı gerekli.`,
     errBedPositive: `Tabla ölçüleri pozitif olmalı.`,
+    errSpecInvalid: `Parametreler pozitif sayı olmalı (akış, hız, piksel ve katman değerleri sıfır olamaz).`,
     errPriceLifetime: `Fiyat ve ömür geçerli olmalı.`,
     fromTemplate: `Şablondan başla (isteğe bağlı)`,
     fromTemplateHint: `Benzer bir yazıcının değerlerini kopyalar; sonra düzenleyebilirsiniz.`,

@@ -5,7 +5,12 @@ import { useI18n } from '../lib/i18n/index.tsx'
 
 export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrintParams; onChange: (p: FdmPrintParams) => void; printer: PrinterProfile }) {
   const { t } = useI18n()
-  const set = <K extends keyof FdmPrintParams>(k: K, v: FdmPrintParams[K]) => onChange({ ...params, [k]: v })
+  const MIN: Partial<Record<keyof FdmPrintParams, number>> = { layerHeight: 0.01, lineWidth: 0.1, wallLoops: 1, topBottomLayers: 0, infillDensity: 0, supportDensity: 0.01, overhangThresholdDeg: 1, colorCount: 1, colorChangesPerLayer: 0 }
+  const set = <K extends keyof FdmPrintParams>(k: K, v: FdmPrintParams[K]) => {
+    const min = MIN[k]
+    const val = typeof v === 'number' && min !== undefined ? (Number.isFinite(v) ? Math.max(min, v) : min) : v
+    onChange({ ...params, [k]: val })
+  }
   const multi = printer.spec.tech === 'fdm' && printer.spec.supportsMultiColor
   // Seçili ön ayarı, mevcut parametrelerden türet: bir preset'in tüm alanları eşleşiyorsa o seçili görünür,
   // kullanıcı elle bir değer değiştirdiğinde otomatik olarak "Özel"e döner.
@@ -58,7 +63,12 @@ export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrint
 
 export function ResinParamsPanel({ params, onChange }: { params: ResinPrintParams; onChange: (p: ResinPrintParams) => void }) {
   const { t } = useI18n()
-  const set = <K extends keyof ResinPrintParams>(k: K, v: ResinPrintParams[K]) => onChange({ ...params, [k]: v })
+  const MIN: Partial<Record<keyof ResinPrintParams, number>> = { layerHeight: 0.01, exposureSec: 0.1, bottomExposureSec: 0.1, bottomLayers: 0, liftCycleSec: 0, supportRatio: 0, overhangThresholdDeg: 1, hollowWallMm: 0.5, hollowResidualRatio: 0 }
+  const set = <K extends keyof ResinPrintParams>(k: K, v: ResinPrintParams[K]) => {
+    const min = MIN[k]
+    const val = typeof v === 'number' && min !== undefined ? (Number.isFinite(v) ? Math.max(min, v) : min) : v
+    onChange({ ...params, [k]: val })
+  }
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">

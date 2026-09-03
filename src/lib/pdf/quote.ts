@@ -72,11 +72,14 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
   const W = doc.internal.pageSize.getWidth()
   const M = 15
   const now = new Date()
-  const quoteNo = `T-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+  const quoteNo = `T-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
   const validUntil = new Date(now.getTime() + settings.quoteValidityDays * 86400000)
   const dateStr = (d: Date) => d.toLocaleDateString('tr-TR')
   const finalY = () => (doc as unknown as WithTable).lastAutoTable.finalY
   let y = M
+  const pageH = doc.internal.pageSize.getHeight()
+  /** Kalan alan yetmiyorsa yeni sayfa aç (altbilgi için 20 mm pay). */
+  const ensure = (needed: number) => { if (y + needed > pageH - 20) { doc.addPage(); y = M } }
 
   // --- Başlık: logo + firma / TEKLİF ---
   let textX = M
@@ -101,7 +104,9 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
 
   if (q.customer.trim()) {
     doc.setFontSize(10); doc.setFont('DejaVu', 'bold'); doc.text(t('pdf.dear'), M, y)
-    doc.setFont('DejaVu', 'normal'); doc.text(q.customer.trim(), M + 12, y); y += 7
+    doc.setFont('DejaVu', 'normal')
+    const custLines = doc.splitTextToSize(q.customer.trim(), W - 2 * M - 12) as string[]
+    doc.text(custLines, M + 12, y); y += 4.5 * custLines.length + 2.5
   }
 
   // --- Model görseli (sol) + bilgi tablosu (sağ) ---
@@ -169,6 +174,7 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
 
   // --- Üretim bilgisi (isteğe bağlı) ---
   if (q.includeProduction) {
+    ensure(24)
     doc.setFontSize(9); doc.setFont('DejaVu', 'bold'); doc.text(t('pdf.productionTitle'), M, y); y += 4.5
     doc.setFont('DejaVu', 'normal'); doc.setTextColor(60)
     const totalMat = est.total.materialGrams >= 1000 ? `${num(est.total.materialGrams / 1000, 2)} kg` : `${num(est.total.materialGrams, 0)} g`
@@ -177,16 +183,25 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
       t('pdf.prodTime', { plate: formatDuration(est.plateTimeSec, t), total: formatDuration(est.total.printTimeSec, t), layers: est.layerCount }),
       isFdm ? t('pdf.prodLayoutFdm', { parts: est.partsPerPlate, plates: est.plates }) : t('pdf.prodLayoutResin', { parts: est.partsPerPlate, plates: est.plates }),
     ]
-    for (const l of lines) { doc.text(l, M, y); y += 4.5 }
+    for (const l of lines) { const wrapped = doc.splitTextToSize(l, W - 2 * M) as string[]; ensure(4.5 * wrapped.length); doc.text(wrapped, M, y); y += 4.5 * wrapped.length }
     doc.setTextColor(0); y += 3
   }
 
   // --- Notlar ---
   if (settings.quoteNote.trim()) {
+    ensure(14)
     doc.setFont('DejaVu', 'bold'); doc.setFontSize(9); doc.text(t('pdf.notesTitle'), M, y); y += 4.5
     doc.setFont('DejaVu', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60)
     const lines = doc.splitTextToSize(settings.quoteNote.trim(), W - 2 * M) as string[]
-    doc.text(lines, M, y); y += lines.length * 4
+    // Uzun notlar sayfa sayfa akar
+    const perPage = Math.max(1, Math.floor((pageH - 20 - M) / 4))
+    let i = 0
+    while (i < lines.length) {
+      const avail = Math.max(1, Math.floor((pageH - 20 - y) / 4))
+      const chunk = lines.slice(i, i + Math.min(avail, perPage))
+      if (chunk.length === 0 || (avail < 3 && i < lines.length)) { doc.addPage(); y = M; continue }
+      doc.text(chunk, M, y); y += chunk.length * 4; i += chunk.length
+    }
     doc.setTextColor(0)
   }
 
