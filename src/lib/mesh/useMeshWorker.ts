@@ -21,7 +21,7 @@ export interface AnalysisState {
 export interface MeshWorkerState {
   model: LoadedModel | null
   analysis: AnalysisState
-  busy: 'idle' | 'parsing' | 'analyzing'
+  busy: 'idle' | 'reading' | 'parsing' | 'analyzing'
   progress: number
   error: string | null
 }
@@ -35,7 +35,11 @@ export interface AnalyzeParams {
 
 export function useMeshWorker() {
   const workerRef = useRef<Worker | null>(null)
-  const reqId = useRef(0)
+  // Yükleme ve analiz istekleri ayrı sayaçlarla izlenir; böylece araya giren bir analiz isteği
+  // "yüklendi" cevabının yok sayılmasına yol açmaz.
+  const loadId = useRef(0)
+  const analyzeId = useRef(0)
+  const pendingPlacement = useRef<Placement | null>(null)
   const [state, setState] = useState<MeshWorkerState>({
     model: null,
     analysis: { stats: null, overhangMask: null, placement: { rotX: 0, rotY: 0, rotZ: 0, scale: 1 } },
@@ -43,45 +47,73 @@ export function useMeshWorker() {
     progress: 0,
     error: null,
   })
-  const pendingPlacement = useRef<Placement | null>(null)
 
   useEffect(() => {
-    const w = new Worker(new URL('../../workers/mesh.worker.ts', import.meta.url), { type: 'module' })
+    let w: Worker
+    try {
+      w = new Worker(new URL('../../workers/mesh.worker.ts', import.meta.url), { type: 'module' })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      queueMicrotask(() => setState((s) => ({ ...s, error: `Web Worker başlatılamadı: ${message}` })))
+      return
+    }
     workerRef.current = w
     w.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       const msg = ev.data
-      if (msg.id !== reqId.current && msg.type !== 'progress') return // eski cevap
-      if (msg.type === 'progress') {
-        if (msg.id !== reqId.current) return
-        setState((s) => ({ ...s, progress: msg.fraction }))
-      } else if (msg.type === 'loaded') {
-        setState((s) => ({
-          ...s,
-          model: s.model ? { ...s.model, positions: msg.positions, triangleCount: msg.triangleCount, format: msg.format } : null,
-          busy: 'idle',
-          progress: 1,
-        }))
-      } else if (msg.type === 'analyzed') {
-        setState((s) => ({
-          ...s,
-          analysis: { stats: msg.stats, overhangMask: msg.overhangMask, placement: pendingPlacement.current ?? s.analysis.placement },
-          busy: 'idle',
-          progress: 1,
-          error: null,
-        }))
-      } else if (msg.type === 'error') {
-        setState((s) => ({ ...s, busy: 'idle', error: msg.message }))
+      switch (msg.type) {
+        case 'progress': {
+          const current = msg.phase === 'parse' ? loadId.current : analyzeId.current
+          if (msg.id !== current) return
+          setState((s) => ({ ...s, progress: msg.fraction }))
+          return
+        }
+        case 'loaded': {
+          if (msg.id !== loadId.current) return
+          setState((s) => ({
+            ...s,
+            model: s.model ? { ...s.model, positions: msg.positions, triangleCount: msg.triangleCount, format: msg.format } : null,
+            busy: 'idle',
+            progress: 1,
+            error: null,
+          }))
+          return
+        }
+        case 'analyzed': {
+          if (msg.id !== analyzeId.current) return
+          setState((s) => ({
+            ...s,
+            analysis: { stats: msg.stats, overhangMask: msg.overhangMask, placement: pendingPlacement.current ?? s.analysis.placement },
+            busy: 'idle',
+            progress: 1,
+            error: null,
+          }))
+          return
+        }
+        case 'error': {
+          // Eski bir isteğin hatası bile olsa göster; kullanıcı ne olduğunu bilmeli.
+          setState((s) => ({ ...s, busy: 'idle', error: msg.message }))
+          return
+        }
       }
     }
-    w.onerror = (e) => setState((s) => ({ ...s, busy: 'idle', error: e.message || 'Worker hatası' }))
+    w.onerror = (e) => {
+      setState((s) => ({ ...s, busy: 'idle', error: `Worker hatası: ${e.message || 'bilinmeyen (dosya çok büyük olabilir)'}` }))
+    }
     return () => { w.terminate(); workerRef.current = null }
   }, [])
 
-  const send = (msg: WorkerRequest, transfer?: Transferable[]) => workerRef.current?.postMessage(msg, transfer ?? [])
+  const send = (msg: WorkerRequest, transfer?: Transferable[]) => {
+    if (!workerRef.current) throw new Error('Worker hazır değil.')
+    workerRef.current.postMessage(msg, transfer ?? [])
+  }
 
   const loadFile = useCallback(async (file: File): Promise<boolean> => {
     if (file.size > MAX_FILE_BYTES) {
       setState((s) => ({ ...s, error: `Dosya çok büyük (${(file.size / 1048576).toFixed(1)} MB). Üst sınır 200 MB.` }))
+      return false
+    }
+    if (file.size === 0) {
+      setState((s) => ({ ...s, error: 'Dosya boş (0 bayt).' }))
       return false
     }
     const ext = file.name.toLowerCase().split('.').pop() ?? ''
@@ -89,30 +121,43 @@ export function useMeshWorker() {
       setState((s) => ({ ...s, error: 'Desteklenen biçimler: .stl (binary/ASCII) ve .obj' }))
       return false
     }
-    const id = ++reqId.current
+    const id = ++loadId.current
+    analyzeId.current++ // bekleyen analiz cevaplarını geçersiz kıl
     setState((s) => ({
       ...s,
       model: { fileName: file.name, fileSize: file.size, format: '', triangleCount: 0, positions: new Float32Array(0) },
       analysis: { ...s.analysis, stats: null, overhangMask: null },
-      busy: 'parsing',
+      busy: 'reading',
       progress: 0,
       error: null,
     }))
-    const buffer = await file.arrayBuffer()
-    send({ type: 'load', id, buffer, fileName: file.name }, [buffer])
-    return true
+    try {
+      const buffer = await file.arrayBuffer()
+      if (id !== loadId.current) return false // bu arada başka dosya seçildi
+      setState((s) => ({ ...s, busy: 'parsing' }))
+      send({ type: 'load', id, buffer, fileName: file.name }, [buffer])
+      return true
+    } catch (e) {
+      setState((s) => ({ ...s, busy: 'idle', error: `Dosya okunamadı: ${e instanceof Error ? e.message : String(e)}` }))
+      return false
+    }
   }, [])
 
   const analyze = useCallback((params: AnalyzeParams) => {
-    const id = ++reqId.current
+    const id = ++analyzeId.current
     pendingPlacement.current = params.placement
     setState((s) => ({ ...s, busy: 'analyzing', progress: 0 }))
-    send({ type: 'analyze', id, ...params })
+    try {
+      send({ type: 'analyze', id, ...params })
+    } catch (e) {
+      setState((s) => ({ ...s, busy: 'idle', error: e instanceof Error ? e.message : String(e) }))
+    }
   }, [])
 
   const clear = useCallback(() => {
-    reqId.current++
-    send({ type: 'unload' })
+    loadId.current++
+    analyzeId.current++
+    try { send({ type: 'unload' }) } catch { /* worker yoksa sorun değil */ }
     setState((s) => ({ ...s, model: null, analysis: { ...s.analysis, stats: null, overhangMask: null }, busy: 'idle', progress: 0, error: null }))
   }, [])
 

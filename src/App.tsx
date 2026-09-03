@@ -61,7 +61,7 @@ export default function App() {
   }, [modelLoaded, placement, overhangThresholdDeg, layerHeight, manifoldCheck])
 
   const onFile = useCallback(async (file: File) => {
-    setPlacement(DEFAULT_PLACEMENT)
+    setPlacement((p) => (p.rotX === 0 && p.rotY === 0 && p.rotZ === 0 && p.scale === 1 ? p : DEFAULT_PLACEMENT))
     await mesh.loadFile(file)
   }, [mesh])
 
@@ -88,7 +88,7 @@ export default function App() {
 
   const fits = stats ? checkFit(stats, printer).fits : true
   const bedForViewer = useMemo(() => ({ x: printer.bed.x, y: printer.bed.y, z: printer.bed.z }), [printer])
-  const busyLabel = mesh.busy === 'parsing' ? 'Dosya okunuyor' : mesh.busy === 'analyzing' ? 'Geometri analiz ediliyor' : ''
+  const busyLabel = mesh.busy === 'reading' ? 'Dosya okunuyor' : mesh.busy === 'parsing' ? 'STL ayrıştırılıyor' : mesh.busy === 'analyzing' ? 'Geometri analiz ediliyor' : ''
 
   const resetAll = () => { resetSettings(); resetMaterialPrices(); resetPrinterOverrides() }
 
@@ -213,7 +213,16 @@ export default function App() {
             {estimate && material ? (
               <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} />
             ) : (
-              <p className="text-sm text-zinc-500">{mesh.model ? 'Hesaplanıyor…' : 'Bir STL dosyası yükleyin.'}</p>
+              <div className="text-sm text-zinc-500">
+                {mesh.error ? (
+                  <p className="text-red-300">Hesaplama yapılamadı: {mesh.error}</p>
+                ) : mesh.model ? (
+                  <>
+                    <p>{busyLabel || 'Hesaplanıyor'}… {mesh.busy !== 'idle' && `${Math.round(mesh.progress * 100)}%`}</p>
+                    <p className="mt-1 text-[11px]">Büyük dosyalarda bu adım birkaç saniye sürebilir.</p>
+                  </>
+                ) : 'Bir STL dosyası yükleyin.'}
+              </div>
             )}
           </Card>
           <Card title="Nasıl hesaplanıyor?">

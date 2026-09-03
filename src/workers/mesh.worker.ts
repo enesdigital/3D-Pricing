@@ -9,6 +9,10 @@ let original: Float32Array | null = null
 const post = (msg: WorkerResponse, transfer?: Transferable[]) =>
   (self as unknown as Worker).postMessage(msg, transfer ?? [])
 
+self.onerror = (e) => {
+  post({ type: 'error', id: -1, message: typeof e === 'string' ? e : (e as ErrorEvent).message ?? 'Worker içinde beklenmeyen hata' })
+}
+
 self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
   const msg = ev.data
   try {
@@ -17,6 +21,7 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
       return
     }
     if (msg.type === 'load') {
+      original = null
       const ext = msg.fileName.toLowerCase().split('.').pop()
       const onProgress = (f: number) => post({ type: 'progress', id: msg.id, phase: 'parse', fraction: f })
       const parsed = ext === 'obj' ? parseObj(msg.buffer, onProgress) : parseStl(msg.buffer, onProgress)
