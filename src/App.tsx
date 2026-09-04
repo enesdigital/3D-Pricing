@@ -26,6 +26,7 @@ import { downloadQuotePdf, type QuoteImage, type QuotePricing } from './lib/pdf/
 import { imageSize } from './lib/pdf/image.ts'
 import { QuoteDialog } from './components/QuoteDialog.tsx'
 import { SlicerImport } from './components/SlicerImport.tsx'
+import { ProfileImport } from './components/ProfileImport.tsx'
 import { SharedQuoteView } from './components/SharedQuoteView.tsx'
 import { HistoryDialog } from './components/HistoryDialog.tsx'
 import { PwaToast } from './components/PwaToast.tsx'
@@ -453,6 +454,14 @@ export default function App() {
                 <Button onClick={() => setMatEditor({ open: true, material: null })}>{t('actions.addMaterial')}</Button>
                 {material && isCustomMaterial(material.id) && <Button variant="ghost" onClick={() => setMatEditor({ open: true, material })}>{t('actions.editDelete')}</Button>}
               </div>
+              {printer.tech === 'fdm' && (
+                <ProfileImport
+                  printer={printer} material={material ?? null} fdmParams={fdmParams}
+                  onAddMaterial={(m) => { setCustomMaterials((list) => [...list, m]); setMaterialId(m.id) }}
+                  onAddPrinter={(p) => { setCustomPrinters((list) => [...list, p]); setPrinterId(p.id) }}
+                  onParams={setFdmParams}
+                />
+              )}
               {!projectMode && <Field label={t('fields.quantity')}><NumberInput value={qty} onChange={setQty} min={1} max={MAX_QUANTITY} step={1} /></Field>}
             </div>
           </Card>
