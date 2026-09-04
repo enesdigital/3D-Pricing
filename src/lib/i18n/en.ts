@@ -22,7 +22,7 @@ export const en: Dict = {
     resinSettings: `Print settings (Resin)`,
     priceEstimate: `Price estimate`,
     comparison: `Printer comparison`,
-    comparisonHint: `Curated profiles, your printers and the selected printer`,
+    comparisonHint: `Listed printers and your own printers`,
     how: `How is it calculated?`,
   },
   units: { min: `min`, days: `days` },

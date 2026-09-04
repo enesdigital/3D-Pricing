@@ -324,13 +324,21 @@ const normKey = (p: PrinterProfile) => `${p.brand} ${p.name}`.toLowerCase()
   .replace(/\s+/g, ' ').trim()
 const curatedKeys = new Set(CURATED_PRINTERS.map(normKey))
 
-/** Tüm dahili yazıcılar: seçilmiş profiller + perakende kataloğu (aynı model tekrar eklenmez). Marka/model sırasıyla. */
-export const PRINTERS: PrinterProfile[] = [
+/** Tüm dahili profiller: seçilmiş profiller + perakende kataloğu (aynı model tekrar eklenmez). Marka/model sırasıyla.
+ *  Açılır listede gösterilmez; "Yazıcı ekle" penceresinde şablon olarak sunulur. */
+export const ALL_PRINTERS: PrinterProfile[] = [
   ...CURATED_PRINTERS,
   ...CATALOG_PRINTERS.filter((p) => !curatedKeys.has(normKey(p))),
 ].sort((a, b) => a.tech.localeCompare(b.tech) || a.brand.localeCompare(b.brand, 'tr') || a.name.localeCompare(b.name, 'tr', { numeric: true }))
 
-/** Varsayılan seçim: Bambu Lab A1 Combo (seçilmiş listenin ilki) */
-export const DEFAULT_PRINTER_ID = CURATED_PRINTERS[0].id
+/** Açılır listede yer alan yazıcılar (kullanıcının atölyesi): sıra korunur. Diğer profiller şablon olarak kalır. */
+export const ACTIVE_PRINTER_IDS = ['bambu-a1-combo', 'bambu-x2d-combo', 'elegoo-jupiter-2', 'cat-anycubic-photon-p1'] as const
 
-export const printerById = (id: string) => PRINTERS.find((p) => p.id === id) ?? PRINTERS[0]
+export const PRINTERS: PrinterProfile[] = ACTIVE_PRINTER_IDS
+  .map((id) => ALL_PRINTERS.find((p) => p.id === id))
+  .filter((p): p is PrinterProfile => !!p)
+
+/** Varsayılan seçim: Bambu Lab A1 Combo (aktif listenin ilki) */
+export const DEFAULT_PRINTER_ID = PRINTERS[0].id
+
+export const printerById = (id: string) => ALL_PRINTERS.find((p) => p.id === id) ?? PRINTERS[0]

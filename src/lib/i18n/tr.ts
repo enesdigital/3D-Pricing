@@ -20,7 +20,7 @@ export const tr = {
     resinSettings: `Baskı ayarları (Reçine)`,
     priceEstimate: `Fiyat tahmini`,
     comparison: `Yazıcı karşılaştırması`,
-    comparisonHint: `Seçilmiş profiller, eklediğiniz yazıcılar ve seçili yazıcı`,
+    comparisonHint: `Listedeki yazıcılar ve eklediğiniz yazıcılar`,
     how: `Nasıl hesaplanıyor?`,
   },
   units: { min: `dk`, days: `gün` },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PRINTERS, CURATED_PRINTERS, DEFAULT_PRINTER_ID } from './data/printers.ts'
+import { PRINTERS, ALL_PRINTERS, DEFAULT_PRINTER_ID } from './data/printers.ts'
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact, fmtMoney } from './lib/cost/engine.ts'
@@ -114,6 +114,11 @@ export default function App() {
     ...customPrinters,
   ], [printerOverrides, customPrinters])
   const isCustom = (id: string) => customPrinters.some((p) => p.id === id)
+  /** "Yazıcı ekle" şablonları: aktif liste, eklenenler ve tüm katalog (150+ profil) */
+  const templatePrinters = useMemo<PrinterProfile[]>(() => {
+    const seen = new Set(printers.map((p) => p.id))
+    return [...printers, ...ALL_PRINTERS.filter((p) => !seen.has(p.id))]
+  }, [printers])
   const savePrinter = (p: PrinterProfile) => {
     setCustomPrinters((list) => (list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p]))
     setPrinterId(p.id)
@@ -274,10 +279,8 @@ export default function App() {
   // Tüm yazıcılar için hızlı karşılaştırma
   const comparison = useMemo(() => {
     if (!stats) return []
-    // Tüm katalog (160+ yazıcı) yerine: seçilmiş profiller + eklediğiniz yazıcılar + seçili yazıcı
-    const curatedIds = new Set(CURATED_PRINTERS.map((p) => p.id))
-    const subset = printers.filter((p) => curatedIds.has(p.id) || isCustom(p.id) || p.id === printer.id)
-    return subset.map((p) => {
+    // Aktif liste (atölyedeki yazıcılar) + eklediğiniz yazıcılar
+    return printers.map((p) => {
       const mats = materials.filter((m) => m.tech === p.tech)
       const m = p.tech === printer.tech && material ? material : mats[0]
       const est: Estimate = projectMode && projectParts.length > 0
@@ -582,7 +585,7 @@ export default function App() {
       {shared && <SharedQuoteView quote={shared} onClose={() => { setShared(null); history.replaceState(null, '', location.pathname + location.search) }} />}
       <PrinterEditor
         key={`printer-${editor.open ? (editor.printer?.id ?? 'new') : 'closed'}`}
-        open={editor.open} initial={editor.printer} templates={printers}
+        open={editor.open} initial={editor.printer} templates={templatePrinters}
         onSave={savePrinter} onDelete={deletePrinter} onClose={() => setEditor({ open: false, printer: null })}
       />
       <MaterialEditor
