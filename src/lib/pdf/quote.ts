@@ -33,6 +33,8 @@ export interface QuoteInput {
   includeProduction: boolean
   /** Çok parçalı proje: parça listesi (varsa model satırı ve hizmet açıklaması proje olarak yazılır) */
   parts?: { name: string; quantity: number; size: { x: number; y: number; z: number }; unitPrice: number; total: number }[]
+  /** Dışarıdan verilen teklif numarası (geçmişe kayıtla aynı olsun diye) */
+  quoteNo?: string
 }
 
 export interface QuoteFonts { regular: string; bold: string } // base64 TTF
@@ -47,11 +49,17 @@ export function quoteFileName(q: QuoteInput, quoteNo: string, t: Translate): str
 }
 
 /** Teklifi A4 PDF olarak üretir ve tarayıcıda indirme başlatır. Kütüphane ve yazı tipleri tembel yüklenir. */
-export async function downloadQuotePdf(q: QuoteInput, t: Translate): Promise<void> {
+export async function downloadQuotePdf(q: QuoteInput, t: Translate): Promise<string> {
   const { loadQuoteFonts } = await import('./fonts')
   const fonts = await loadQuoteFonts()
   const { doc, quoteNo } = await buildQuotePdf(q, fonts, t)
   doc.save(quoteFileName(q, quoteNo, t))
+  return quoteNo
+}
+
+/** Teklif numarası: T-YYYYMMDD-HHMMSS (verilmişse dışarıdan gelen numara kullanılır) */
+export function makeQuoteNo(now = new Date()): string {
+  return `T-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
 }
 
 type WithTable = { lastAutoTable: { finalY: number } }
@@ -76,7 +84,7 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
   const W = doc.internal.pageSize.getWidth()
   const M = 15
   const now = new Date()
-  const quoteNo = `T-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+  const quoteNo = q.quoteNo ?? makeQuoteNo(now)
   const validUntil = new Date(now.getTime() + settings.quoteValidityDays * 86400000)
   const dateStr = (d: Date) => d.toLocaleDateString('tr-TR')
   const finalY = () => (doc as unknown as WithTable).lastAutoTable.finalY

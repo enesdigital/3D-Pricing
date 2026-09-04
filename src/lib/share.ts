@@ -87,20 +87,22 @@ export function downloadText(name: string, text: string, type = 'text/plain') {
 
 /** Ayar/veri yedeği: uygulamanın tüm localStorage anahtarları */
 export const BACKUP_KEYS = ['settings', 'materialPrices', 'printerOverrides', 'customPrinters', 'customMaterials', 'calibrations', 'fdmParams', 'resinParams', 'printerId', 'materialIdByTech', 'manifoldCheck', 'thicknessCheck', 'quoteLogo', 'theme', 'lang']
-export function exportBackup(prefix: string): string {
-  const out: Record<string, unknown> = { app: '3D-Pricing', version: 1, exportedAt: new Date().toISOString(), data: {} }
+export function exportBackup(prefix: string, history?: { quotes: unknown[]; customers: unknown[] }): string {
+  const out: Record<string, unknown> = { app: '3D-Pricing', version: 2, exportedAt: new Date().toISOString(), data: {} }
   for (const k of BACKUP_KEYS) {
     const raw = localStorage.getItem(prefix + k)
     if (raw != null) { try { (out.data as Record<string, unknown>)[k] = JSON.parse(raw) } catch { (out.data as Record<string, unknown>)[k] = raw } }
   }
+  if (history) out.history = history
   return JSON.stringify(out, null, 2)
 }
-export function importBackup(prefix: string, text: string): number {
-  const j = JSON.parse(text) as { app?: string; data?: Record<string, unknown> }
+/** Yedeği localStorage'a yazar; teklif geçmişi (IndexedDB) ayrıca `history` alanında döner */
+export function importBackup(prefix: string, text: string): { n: number; history: { quotes?: unknown[]; customers?: unknown[] } | null } {
+  const j = JSON.parse(text) as { app?: string; data?: Record<string, unknown>; history?: { quotes?: unknown[]; customers?: unknown[] } }
   if (j.app !== '3D-Pricing' || !j.data || typeof j.data !== 'object') throw new Error('Geçersiz yedek dosyası')
   let n = 0
   for (const k of BACKUP_KEYS) {
     if (k in j.data) { localStorage.setItem(prefix + k, JSON.stringify(j.data[k])); n++ }
   }
-  return n
+  return { n, history: j.history && typeof j.history === 'object' ? j.history : null }
 }

@@ -27,6 +27,9 @@ import { imageSize } from './lib/pdf/image.ts'
 import { QuoteDialog } from './components/QuoteDialog.tsx'
 import { SlicerImport } from './components/SlicerImport.tsx'
 import { SharedQuoteView } from './components/SharedQuoteView.tsx'
+import { HistoryDialog } from './components/HistoryDialog.tsx'
+import { buildQuoteRecord, historyAvailable, makeThumb, saveQuote, upsertCustomerByName } from './lib/history/index.ts'
+import { makeQuoteNo } from './lib/pdf/quote.ts'
 import { readShareFromHash, type SharedQuote } from './lib/share.ts'
 import { calibrationFactors, type CalibrationRecord, type SlicerData, type SlicerOverride } from './lib/slicer/index.ts'
 import { useI18n, LANGS } from './lib/i18n/index.tsx'
@@ -65,6 +68,7 @@ export default function App() {
   const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [modelImage, setModelImage] = useState<QuoteImage | null>(null)
   const [logo, setLogo] = useLocalStorage<QuoteImage | null>(LS + 'quoteLogo', null)
   const captureRef = useRef<(() => string | null) | null>(null)
@@ -319,6 +323,20 @@ export default function App() {
   }, [projectMode, plates, plateIdx, projectEstimate, viewerParts, stats, layout, qty, bedForViewer])
   const busyLabel = mesh.busy === 'reading' ? t('busy.reading') : mesh.busy === 'parsing' ? t('busy.parsing') : mesh.busy === 'analyzing' ? t('busy.analyzing') : ''
 
+  /** Teklifi geçmişe (IndexedDB) yazar; müşteri adı varsa kartı oluşturur/bağlar. Hata sessizce yutulur (konsola). */
+  const persistQuote = useCallback(async (pricing: QuotePricing, quoteNo: string): Promise<boolean> => {
+    if (!shownEstimate || !material || !historyAvailable()) return false
+    try {
+      const cust = await upsertCustomerByName(customer)
+      const partList = projectMode && projectEstimate
+        ? projectEstimate.project.parts.filter((p) => p.placed > 0).map((p) => ({ name: p.name, quantity: p.placed, size: projectParts.find((x) => x.id === p.id)!.stats.size }))
+        : stats ? [{ name: mesh.model?.fileName ?? '', quantity: qty, size: stats.size }] : []
+      const thumb = modelImage ? await makeThumb(modelImage.dataUrl) : null
+      const rec = buildQuoteRecord({ est: shownEstimate, pricing, settings, printer, material, fileName: projectFileName, customer, customerId: cust?.id ?? null, size: stats ? stats.size : { x: 0, y: 0, z: 0 }, parts: partList, quoteNo, thumb })
+      await saveQuote(rec)
+      return true
+    } catch (e) { console.warn('quote history save failed', e); return false }
+  }, [shownEstimate, material, customer, projectMode, projectEstimate, projectParts, stats, mesh.model, qty, modelImage, settings, printer, projectFileName])
   const cmpQty = shownEstimate?.quantity ?? qty
   const resetAll = () => { resetSettings(); resetMaterialPrices(); resetPrinterOverrides() }
 
@@ -344,6 +362,7 @@ export default function App() {
             <Button variant="ghost" onClick={toggleTheme} ariaLabel={theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')} title={theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')}>
               <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
             </Button>
+            <Button onClick={() => setHistoryOpen(true)} ariaLabel={t('history.buttonAria')} title={t('history.title')}>{t('history.button')}</Button>
             <Button onClick={() => setSettingsOpen(true)} ariaLabel={t('header.settingsAria')} title={t('header.settingsTitle')}>{t('header.settings')}</Button>
           </div>
         </div>
@@ -529,6 +548,10 @@ export default function App() {
 
       {shownEstimate && material && quoteOpen && (
         <QuoteDialog
+          onSave={async (pricing: QuotePricing) => {
+            const quoteNo = makeQuoteNo()
+            return (await persistQuote(pricing, quoteNo)) ? quoteNo : null
+          }}
           open={quoteOpen} est={shownEstimate} settings={settings}
           customer={customer} onCustomer={setCustomer}
           logo={logo} onLogo={setLogo} modelImage={modelImage}
@@ -543,7 +566,9 @@ export default function App() {
               const parts = projectMode && projectEstimate
                 ? projectEstimate.project.parts.filter((p) => p.placed > 0).map((p) => ({ name: p.name, quantity: p.placed, size: projectParts.find((x) => x.id === p.id)!.stats.size, unitPrice: p.unitPrice, total: p.price }))
                 : undefined
-              await downloadQuotePdf({ est: shownEstimate, stats: pdfStats, printer, material, settings, fdmParams, resinParams, placement, fileName: projectFileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction, parts }, t)
+              const quoteNo = makeQuoteNo()
+              await downloadQuotePdf({ est: shownEstimate, stats: pdfStats, printer, material, settings, fdmParams, resinParams, placement, fileName: projectFileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction, parts, quoteNo }, t)
+              void persistQuote(pricing, quoteNo)
               setQuoteOpen(false)
             } catch (e) {
               setPdfError(e instanceof Error ? e.message : String(e))
@@ -551,6 +576,7 @@ export default function App() {
           }}
         />
       )}
+      <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} whatsappNumber={settings.whatsappNumber ?? ''} />
       {shared && <SharedQuoteView quote={shared} onClose={() => { setShared(null); history.replaceState(null, '', location.pathname + location.search) }} />}
       <PrinterEditor
         key={`printer-${editor.open ? (editor.printer?.id ?? 'new') : 'closed'}`}

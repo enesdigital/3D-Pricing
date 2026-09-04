@@ -4,6 +4,7 @@ import { Button, Field, NumberInput, Select, Toggle } from './ui.tsx'
 import { useState } from 'react'
 import { CalibrationPanel } from './CalibrationPanel.tsx'
 import { downloadText, exportBackup, importBackup } from '../lib/share.ts'
+import { exportHistory, importHistory, type HistoryBackup } from '../lib/history/index.ts'
 const LS_PREFIX = 'fdm-sla-calc:v1:'
 import type { CalibrationRecord, CalibrationFactors } from '../lib/slicer/types.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
@@ -59,13 +60,13 @@ export function SettingsDialog(p: Props) {
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <h2 className="text-base font-semibold">{t('settings.title')}</h2>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => downloadText(`3d-pricing-ayarlar_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(LS_PREFIX), 'application/json')}>⬇ {t('share.exportBackup')}</Button>
+            <Button variant="ghost" onClick={async () => { let h: HistoryBackup | undefined; try { h = await exportHistory() } catch { h = undefined } downloadText(`3d-pricing-ayarlar_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(LS_PREFIX, h), 'application/json') }}>⬇ {t('share.exportBackup')}</Button>
             <label className="cursor-pointer rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-100 hover:bg-zinc-700">
               ⬆ {t('share.importBackup')}
               <input type="file" accept=".json,application/json" className="hidden" onChange={async (e) => {
                 const f = e.target.files?.[0]; e.target.value = ''
                 if (!f) return
-                try { const n = importBackup(LS_PREFIX, await f.text()); alert(t('share.importDone', { n })); location.reload() } catch (err) { alert(t('share.importError', { e: err instanceof Error ? err.message : String(err) })) }
+                try { const r = importBackup(LS_PREFIX, await f.text()); let n = r.n; if (r.history) { try { n += await importHistory(r.history as Partial<HistoryBackup>) } catch { /* geçmiş içe aktarılamadı */ } } alert(t('share.importDone', { n })); location.reload() } catch (err) { alert(t('share.importError', { e: err instanceof Error ? err.message : String(err) })) }
               }} />
             </label>
             <Button variant="ghost" onClick={p.onReset}>{t('settings.reset')}</Button>

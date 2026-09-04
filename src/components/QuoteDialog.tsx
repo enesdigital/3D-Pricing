@@ -7,6 +7,7 @@ import { Button, Field, NumberInput, Toggle } from './ui.tsx'
 import { buildSharedQuote, shareUrl, whatsappUrl, quoteCsv, downloadText } from '../lib/share.ts'
 import type { Material, PrinterProfile } from '../lib/cost/types.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
+import { historyAvailable, listCustomers, normName, type CustomerRecord } from '../lib/history/index.ts'
 
 interface Props {
   open: boolean
@@ -20,6 +21,8 @@ interface Props {
   busy: boolean
   error: string | null
   onGenerate: (pricing: QuotePricing, includeProduction: boolean) => void
+  /** PDF indirmeden geçmişe kaydet; kaydedilen teklif numarasını döndürür */
+  onSave: (pricing: QuotePricing) => Promise<string | null>
   share: { printer: PrinterProfile; material: Material; fileName: string; size: { x: number; y: number; z: number } }
   onClose: () => void
 }
@@ -40,6 +43,11 @@ export function QuoteDialog(p: Props) {
   const [includeProduction, setIncludeProduction] = useState(true)
   const [logoError, setLogoError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [customers, setCustomers] = useState<CustomerRecord[]>([])
+  const [savedNo, setSavedNo] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { if (p.open && historyAvailable()) listCustomers().then(setCustomers).catch(() => setCustomers([])) }, [p.open])
+  const matchedCustomer = useMemo(() => { const n = normName(p.customer); return n ? customers.find((c) => normName(c.name) === n) ?? null : null }, [customers, p.customer])
 
   useEffect(() => {
     if (!p.open) return
@@ -95,14 +103,17 @@ export function QuoteDialog(p: Props) {
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={p.onClose} disabled={p.busy}>{t('quoteDialog.cancel')}</Button>
+            {historyAvailable() && <Button disabled={p.busy || saving || pricing.total <= 0} title={t('history.saveHint')} onClick={async () => { setSaving(true); try { const no = await p.onSave(pricing); setSavedNo(no) } finally { setSaving(false) } }}>{t('history.saveBtn')}</Button>}
             <Button variant="primary" disabled={p.busy || pricing.total <= 0} onClick={() => p.onGenerate(pricing, includeProduction)}>{p.busy ? t('quoteDialog.busy') : t('quoteDialog.download')}</Button>
           </div>
         </header>
         <div className="space-y-5 p-5">
           {p.error && <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">{t('quoteDialog.genError', { error: p.error })}</div>}
+          {savedNo && <div className="rounded-md border border-emerald-900 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-200">{t('history.saved', { no: savedNo })}</div>}
 
-          <Field label={t('quoteDialog.customer')}>
-            <input value={p.customer} onChange={(e) => p.onCustomer(e.target.value)} placeholder={t('quoteDialog.customerPlaceholder')} className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" />
+          <Field label={t('quoteDialog.customer')} hint={matchedCustomer ? [matchedCustomer.company, matchedCustomer.phone, matchedCustomer.email].filter(Boolean).join(' · ') : undefined}>
+            <input value={p.customer} onChange={(e) => p.onCustomer(e.target.value)} placeholder={t('quoteDialog.customerPlaceholder')} list="quote-customers" className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500" />
+            {customers.length > 0 && <datalist id="quote-customers">{customers.map((c) => <option key={c.id} value={c.name}>{c.company || c.phone || ''}</option>)}</datalist>}
           </Field>
 
           <section className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
@@ -168,7 +179,7 @@ export function QuoteDialog(p: Props) {
               const text = t('share.waText', { name: p.customer.trim() ? ` ${p.customer.trim()}` : '', model: sq.model, printer: sq.printer, material: sq.material, qty: sq.qty, unit: fmtTRY(pricing.unitPrice), total: fmtTRY(pricing.total), gross: fmtTRY(pricing.total * (1 + pricing.vatRate)), lead: est.leadDays, link })
               return (
                 <>
-                  <Button onClick={() => window.open(whatsappUrl(settings.whatsappNumber ?? '', text), '_blank', 'noopener')}>💬 {t('share.whatsapp')}</Button>
+                  <Button onClick={() => window.open(whatsappUrl(matchedCustomer?.phone || settings.whatsappNumber || '', text), '_blank', 'noopener')}>💬 {t('share.whatsapp')}{matchedCustomer?.phone ? ` → ${matchedCustomer.phone}` : ''}</Button>
                   <Button onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('URL', link) } }}>🔗 {copied ? t('share.linkCopied') : t('share.copyLink')}</Button>
                   <Button onClick={() => downloadText(`teklif_${sq.model.replace(/\.[^.]+$/, '')}.csv`, quoteCsv(est, pricing, { model: sq.model, printer: sq.printer, material: sq.material, currency: sq.currency }), 'text/csv')}>📊 {t('share.csv')}</Button>
                 </>
