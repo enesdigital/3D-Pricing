@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_PLACEMENT, type MeshStats, type Placement, type ThicknessData, type WorkerRequest, type WorkerResponse } from './types.ts'
 import type { Translate } from '../cost/types.ts'
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024 // 200 MB üst sınır
+/** Bir projedeki en fazla parça (bellek: her parçanın görüntü kopyası ana iş parçacığında, orijinali worker'da) */
+export const MAX_PARTS = 24
+export const ACCEPTED_EXT = ['stl', 'obj', '3mf', 'step', 'stp', 'iges', 'igs', 'brep', 'brp']
 
 export interface LoadedModel {
   fileName: string
@@ -25,9 +28,22 @@ export interface AnalysisState {
   placement: Placement
 }
 
-export interface MeshWorkerState {
-  model: LoadedModel | null
+/** Projedeki bir parça: yüklenen model + analiz + yerleşim + adet */
+export interface MeshPart {
+  id: string
+  model: LoadedModel
   analysis: AnalysisState
+  placement: Placement
+  quantity: number
+  /** Parça worker'da ayrıştırıldı mı (positions dolu) */
+  loaded: boolean
+  /** Bu parça için bekleyen istek var mı */
+  pending: boolean
+}
+
+export interface MeshWorkerState {
+  parts: MeshPart[]
+  activeId: string | null
   busy: 'idle' | 'reading' | 'parsing' | 'analyzing'
   progress: number
   error: string | null
@@ -41,22 +57,24 @@ export interface AnalyzeParams {
   thickness: boolean
 }
 
+let seq = 0
+const newPartId = () => `part-${Date.now().toString(36)}-${(++seq).toString(36)}`
+
 export function useMeshWorker(t: Translate) {
   const workerRef = useRef<Worker | null>(null)
   // t'nin güncel değerini callback'lerde deps churn'ü olmadan kullanmak için ref
   const tRef = useRef(t)
   useEffect(() => { tRef.current = t }, [t])
-  // Yükleme ve analiz istekleri ayrı sayaçlarla izlenir; böylece araya giren bir analiz isteği
-  // "yüklendi" cevabının yok sayılmasına yol açmaz.
-  const loadId = useRef(0)
-  const analyzeId = useRef(0)
-  const pendingPlacement = useRef<Placement | null>(null)
-  const [state, setState] = useState<MeshWorkerState>({
-    model: null,
-    analysis: { stats: null, overhangMask: null, thickness: null, placement: DEFAULT_PLACEMENT },
-    busy: 'idle',
-    progress: 0,
-    error: null,
+  // İstek kimlikleri: parça başına en son yükleme/analiz kimliği tutulur; eski cevaplar yok sayılır.
+  const reqSeq = useRef(0)
+  const latest = useRef(new Map<string, { load: number; analyze: number }>())
+  const pending = useRef(new Map<number, { partId: string; kind: 'load' | 'analyze'; placement?: Placement }>())
+  const [state, setState] = useState<MeshWorkerState>({ parts: [], activeId: null, busy: 'idle', progress: 0, error: null })
+
+  const idleIfDone = (s: MeshWorkerState): MeshWorkerState => (pending.current.size === 0 ? { ...s, busy: 'idle', progress: 1 } : s)
+  const markPending = (parts: MeshPart[]) => parts.map((p) => {
+    const pend = [...pending.current.values()].some((x) => x.partId === p.id)
+    return pend === p.pending ? p : { ...p, pending: pend }
   })
 
   useEffect(() => {
@@ -73,41 +91,47 @@ export function useMeshWorker(t: Translate) {
       const msg = ev.data
       switch (msg.type) {
         case 'progress': {
-          const current = msg.phase === 'parse' ? loadId.current : analyzeId.current
-          if (msg.id !== current) return
+          if (!pending.current.has(msg.id)) return
           setState((s) => ({ ...s, progress: msg.fraction }))
           return
         }
         case 'loaded': {
-          if (msg.id !== loadId.current) return
-          setState((s) => ({
+          const req = pending.current.get(msg.id)
+          pending.current.delete(msg.id)
+          if (!req || latest.current.get(req.partId)?.load !== msg.id) { setState((s) => idleIfDone({ ...s, parts: markPending(s.parts) })); return }
+          setState((s) => idleIfDone({
             ...s,
-            model: s.model ? { ...s.model, positions: msg.positions, triangleCount: msg.triangleCount, format: msg.format, unit: msg.unit, colorHint: msg.colorHint ?? null, objectCount: msg.objectCount, decimated: msg.decimated } : null,
-            busy: 'idle',
-            progress: 1,
+            parts: markPending(s.parts.map((p) => (p.id === req.partId
+              ? { ...p, loaded: true, model: { ...p.model, positions: msg.positions, triangleCount: msg.triangleCount, format: msg.format, unit: msg.unit, colorHint: msg.colorHint ?? null, objectCount: msg.objectCount, decimated: msg.decimated } }
+              : p))),
             error: null,
           }))
           return
         }
         case 'analyzed': {
-          if (msg.id !== analyzeId.current) return
-          setState((s) => ({
+          const req = pending.current.get(msg.id)
+          pending.current.delete(msg.id)
+          if (!req || latest.current.get(req.partId)?.analyze !== msg.id) { setState((s) => idleIfDone({ ...s, parts: markPending(s.parts) })); return }
+          setState((s) => idleIfDone({
             ...s,
-            analysis: { stats: msg.stats, overhangMask: msg.overhangMask, thickness: msg.thickness, placement: pendingPlacement.current ?? s.analysis.placement },
-            busy: 'idle',
-            progress: 1,
+            parts: markPending(s.parts.map((p) => (p.id === req.partId
+              ? { ...p, analysis: { stats: msg.stats, overhangMask: msg.overhangMask, thickness: msg.thickness, placement: req.placement ?? p.placement } }
+              : p))),
             error: null,
           }))
           return
         }
         case 'error': {
           // Eski bir isteğin hatası bile olsa göster; kullanıcı ne olduğunu bilmeli.
-          // Yükleme sırasında hata: yarım kalan (0 üçgenli) hayalet modeli kaldır.
-          const loadFailed = msg.id === loadId.current
-          setState((s) => ({
-            ...s, busy: 'idle', error: msg.message,
-            model: loadFailed && s.model && s.model.positions.length === 0 ? null : s.model,
-          }))
+          // Yükleme sırasında hata: yarım kalan (0 üçgenli) hayalet parçayı kaldır.
+          const req = pending.current.get(msg.id)
+          pending.current.delete(msg.id)
+          setState((s) => {
+            let parts = s.parts
+            if (req?.kind === 'load') parts = parts.filter((p) => !(p.id === req.partId && !p.loaded))
+            const activeId = parts.some((p) => p.id === s.activeId) ? s.activeId : (parts[0]?.id ?? null)
+            return idleIfDone({ ...s, parts: markPending(parts), activeId, error: msg.message })
+          })
           return
         }
       }
@@ -116,6 +140,7 @@ export function useMeshWorker(t: Translate) {
       setState((s) => ({ ...s, busy: 'idle', error: tRef.current('mesh.workerError', { message: e.message || tRef.current('mesh.workerErrorUnknown') }) }))
     }
     return () => { w.terminate(); workerRef.current = null }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const send = (msg: WorkerRequest, transfer?: Transferable[]) => {
@@ -123,59 +148,113 @@ export function useMeshWorker(t: Translate) {
     workerRef.current.postMessage(msg, transfer ?? [])
   }
 
-  const loadFile = useCallback(async (file: File): Promise<boolean> => {
+  /**
+   * Dosya yükler. `add: false` (varsayılan) etkin parçanın yerine geçer (tek modelli akış);
+   * `add: true` projeye yeni parça ekler. Dönüş: parça kimliği ya da hata durumunda null.
+   */
+  const loadFile = useCallback(async (file: File, opts: { add?: boolean; quantity?: number } = {}): Promise<string | null> => {
     if (file.size > MAX_FILE_BYTES) {
       setState((s) => ({ ...s, error: tRef.current('mesh.tooBig', { size: (file.size / 1048576).toFixed(1) }) }))
-      return false
+      return null
     }
     if (file.size === 0) {
       setState((s) => ({ ...s, error: tRef.current('mesh.empty') }))
-      return false
+      return null
     }
     const ext = file.name.toLowerCase().split('.').pop() ?? ''
-    if (!['stl', 'obj', '3mf', 'step', 'stp', 'iges', 'igs', 'brep', 'brp'].includes(ext)) {
+    if (!ACCEPTED_EXT.includes(ext)) {
       setState((s) => ({ ...s, error: tRef.current('mesh.unsupported') }))
-      return false
+      return null
     }
-    const id = ++loadId.current
-    analyzeId.current++ // bekleyen analiz cevaplarını geçersiz kıl
-    setState((s) => ({
-      ...s,
-      model: { fileName: file.name, fileSize: file.size, format: '', triangleCount: 0, positions: new Float32Array(0) },
-      analysis: { ...s.analysis, stats: null, overhangMask: null, thickness: null },
-      busy: 'reading',
-      progress: 0,
-      error: null,
-    }))
+    const partId = newPartId()
+    const id = ++reqSeq.current
+    latest.current.set(partId, { load: id, analyze: 0 })
+    pending.current.set(id, { partId, kind: 'load' })
+    let replacedId: string | null = null
+    setState((s) => {
+      const add = !!opts.add && s.parts.length > 0
+      if (add && s.parts.length >= MAX_PARTS) return s
+      const part: MeshPart = {
+        id: partId,
+        model: { fileName: file.name, fileSize: file.size, format: '', triangleCount: 0, positions: new Float32Array(0) },
+        analysis: { stats: null, overhangMask: null, thickness: null, placement: DEFAULT_PLACEMENT },
+        placement: DEFAULT_PLACEMENT, quantity: Math.max(1, Math.floor(opts.quantity ?? 1)), loaded: false, pending: true,
+      }
+      let parts: MeshPart[]
+      if (add) parts = [...s.parts, part]
+      else {
+        replacedId = s.activeId
+        const idx = s.parts.findIndex((p) => p.id === s.activeId)
+        parts = idx >= 0 ? s.parts.map((p, i) => (i === idx ? part : p)) : [...s.parts, part]
+      }
+      return { ...s, parts, activeId: partId, busy: 'reading', progress: 0, error: null }
+    })
+    // Yerine geçilen parçanın bekleyen isteklerini geçersiz kıl ve worker'dan bırak
+    if (replacedId) { latest.current.delete(replacedId); try { send({ type: 'unload', partId: replacedId }) } catch { /* yoksay */ } }
     try {
       const buffer = await file.arrayBuffer()
-      if (id !== loadId.current) return false // bu arada başka dosya seçildi
+      if (latest.current.get(partId)?.load !== id) { pending.current.delete(id); return null } // bu arada parça kaldırıldı/değişti
       setState((s) => ({ ...s, busy: 'parsing' }))
-      send({ type: 'load', id, buffer, fileName: file.name }, [buffer])
-      return true
+      send({ type: 'load', id, partId, buffer, fileName: file.name }, [buffer])
+      return partId
     } catch (e) {
-      setState((s) => ({ ...s, busy: 'idle', error: tRef.current('mesh.readFailed', { message: e instanceof Error ? e.message : String(e) }) }))
-      return false
+      pending.current.delete(id)
+      setState((s) => idleIfDone({ ...s, parts: markPending(s.parts.filter((p) => p.id !== partId)), error: tRef.current('mesh.readFailed', { message: e instanceof Error ? e.message : String(e) }) }))
+      return null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const analyze = useCallback((params: AnalyzeParams) => {
-    const id = ++analyzeId.current
-    pendingPlacement.current = params.placement
-    setState((s) => ({ ...s, busy: 'analyzing', progress: 0 }))
+  const analyze = useCallback((partId: string, params: AnalyzeParams) => {
+    const cur = latest.current.get(partId)
+    if (!cur) return
+    const id = ++reqSeq.current
+    // Aynı parçanın önceki analiz isteği geçersiz olur
+    for (const [k, v] of pending.current) if (v.partId === partId && v.kind === 'analyze') pending.current.delete(k)
+    cur.analyze = id
+    pending.current.set(id, { partId, kind: 'analyze', placement: params.placement })
+    setState((s) => ({ ...s, parts: markPending(s.parts), busy: 'analyzing', progress: 0 }))
     try {
-      send({ type: 'analyze', id, ...params })
+      send({ type: 'analyze', id, partId, ...params })
     } catch (e) {
-      setState((s) => ({ ...s, busy: 'idle', error: e instanceof Error ? e.message : String(e) }))
+      pending.current.delete(id)
+      setState((s) => idleIfDone({ ...s, parts: markPending(s.parts), error: e instanceof Error ? e.message : String(e) }))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const remove = useCallback((partId: string) => {
+    latest.current.delete(partId)
+    for (const [k, v] of pending.current) if (v.partId === partId) pending.current.delete(k)
+    try { send({ type: 'unload', partId }) } catch { /* worker yoksa sorun değil */ }
+    setState((s) => {
+      const parts = s.parts.filter((p) => p.id !== partId)
+      const activeId = s.activeId === partId ? (parts[parts.length - 1]?.id ?? null) : s.activeId
+      return idleIfDone({ ...s, parts: markPending(parts), activeId, error: null })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const clear = useCallback(() => {
-    loadId.current++
-    analyzeId.current++
+    latest.current.clear()
+    pending.current.clear()
     try { send({ type: 'unload' }) } catch { /* worker yoksa sorun değil */ }
-    setState((s) => ({ ...s, model: null, analysis: { ...s.analysis, stats: null, overhangMask: null, thickness: null }, busy: 'idle', progress: 0, error: null }))
+    setState({ parts: [], activeId: null, busy: 'idle', progress: 0, error: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { ...state, loadFile, analyze, clear }
+  const setActive = useCallback((partId: string) => setState((s) => (s.parts.some((p) => p.id === partId) ? { ...s, activeId: partId } : s)), [])
+  const setQuantity = useCallback((partId: string, quantity: number) => setState((s) => ({ ...s, parts: s.parts.map((p) => (p.id === partId ? { ...p, quantity } : p)) })), [])
+  const setPlacement = useCallback((partId: string, placement: Placement) => setState((s) => ({ ...s, parts: s.parts.map((p) => (p.id === partId ? { ...p, placement } : p)) })), [])
+
+  const active = useMemo(() => state.parts.find((p) => p.id === state.activeId) ?? null, [state.parts, state.activeId])
+  const emptyAnalysis = useMemo<AnalysisState>(() => ({ stats: null, overhangMask: null, thickness: null, placement: DEFAULT_PLACEMENT }), [])
+  return {
+    ...state,
+    active,
+    /** Etkin parçanın modeli (tek modelli akışla uyumluluk) */
+    model: active?.model ?? null,
+    analysis: active?.analysis ?? emptyAnalysis,
+    loadFile, analyze, remove, clear, setActive, setQuantity, setPlacement,
+  }
 }

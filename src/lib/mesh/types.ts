@@ -73,9 +73,10 @@ export interface MeshStats {
 }
 
 export type WorkerRequest =
-  | { type: 'load'; id: number; buffer: ArrayBuffer; fileName: string }
-  | { type: 'analyze'; id: number; placement: Placement; overhangThresholdDeg: number; manifoldCheck: boolean; layerHeight: number; thickness: boolean }
-  | { type: 'unload' }
+  | { type: 'load'; id: number; partId: string; buffer: ArrayBuffer; fileName: string }
+  | { type: 'analyze'; id: number; partId: string; placement: Placement; overhangThresholdDeg: number; manifoldCheck: boolean; layerHeight: number; thickness: boolean }
+  /** partId verilmezse tüm parçalar bırakılır */
+  | { type: 'unload'; partId?: string }
 
 export type WorkerResponse =
   | { type: 'progress'; id: number; phase: 'parse' | 'analyze'; fraction: number }

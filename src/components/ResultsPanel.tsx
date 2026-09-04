@@ -1,4 +1,5 @@
 import type { Estimate, Material, PrinterProfile, BusinessSettings } from '../lib/cost/types.ts'
+import type { ProjectEstimate } from '../lib/cost/project.ts'
 import { fmtMoney, formatDuration } from '../lib/cost/engine.ts'
 import { Stat } from './ui.tsx'
 import { useI18n } from '../lib/i18n/index.tsx'
@@ -13,6 +14,7 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples, l
   const qty = est.quantity
   const u = est.perUnit
   const t = est.total
+  const project = 'project' in est ? (est as ProjectEstimate).project : null
   return (
     <div className="space-y-4">
       {est.warnings.length > 0 && (
@@ -56,9 +58,29 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples, l
         <Stat label={tr('results.statVolumePer')} value={`${(est.materialVolumeMm3 / 1000).toFixed(1)} cm³`} sub={tr('results.statPrinted')} />
       </div>
 
-      {qty > 1 && (
+      {project && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
-          <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">{tr('results.totalHeader', { qty, plates: est.plates, n: est.partsPerPlate })}</div>
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">{tr('results.projectParts')}</div>
+          <table className="w-full text-xs">
+            <thead className="text-left text-[11px] text-zinc-500"><tr><th className="py-0.5 pr-2 font-normal">{tr('project.colPart')}</th><th className="py-0.5 pr-2 text-right font-normal">{tr('project.colQty')}</th><th className="py-0.5 pr-2 text-right font-normal">g</th><th className="py-0.5 pr-2 text-right font-normal">{tr('project.colUnit')}</th><th className="py-0.5 text-right font-normal">{tr('pdf.thTotal')}</th></tr></thead>
+            <tbody>
+              {project.parts.map((p) => (
+                <tr key={p.id} className={`border-t border-zinc-800/80 ${p.placed === 0 ? 'text-red-300/80' : ''}`}>
+                  <td className="max-w-[160px] truncate py-1 pr-2" title={p.name}>{p.name}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{p.placed}{p.placed !== p.quantity ? `/${p.quantity}` : ''}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{p.gramsPerUnit.toFixed(0)}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{p.placed > 0 ? fmtTRY(p.unitPrice) : '—'}</td>
+                  <td className="py-1 text-right tabular-nums">{p.placed > 0 ? fmtTRY(p.price) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {(qty > 1 || project) && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">{project ? tr('results.projectHeader', { qty, plates: est.plates }) : tr('results.totalHeader', { qty, plates: est.plates, n: est.partsPerPlate })}</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums sm:grid-cols-4">
             <div><span className="text-zinc-500">{tr('results.material')}</span> <b>{fmtGrams(t.materialGrams)}</b></div>
             <div><span className="text-zinc-500">{tr('results.totalTime')}</span> <b>{formatDuration(t.printTimeSec, tr)}</b></div>
@@ -66,7 +88,7 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples, l
             <div><span className="text-zinc-500">{tr('results.cost')}</span> <b>{fmtTRY(t.cost)}</b></div>
           </div>
           <p className="mt-1 text-[11px] leading-snug text-zinc-500">
-            {tr('results.plateTimeNote', { x: formatDuration(est.plateTimeSec, tr), y: formatDuration(est.single.printTimeSec, tr) })}
+            {project ? tr('results.projectNote', { x: formatDuration(est.plateTimeSec, tr) }) : tr('results.plateTimeNote', { x: formatDuration(est.plateTimeSec, tr), y: formatDuration(est.single.printTimeSec, tr) })}
             {est.tech === 'resin' ? tr('results.resinNote') : tr('results.fdmNote')}
           </p>
         </div>

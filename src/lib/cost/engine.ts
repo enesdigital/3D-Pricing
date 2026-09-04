@@ -97,7 +97,7 @@ function sumPlates(plan: { cap: number; full: number; rest: number }, f: (k: num
   return (plan.full > 0 ? plan.full * f(plan.cap) : 0) + (plan.rest > 0 ? f(plan.rest) : 0)
 }
 
-interface CommonInput {
+export interface CommonInput {
   stats: MeshStats
   printer: PrinterProfile
   material: Material
@@ -112,14 +112,43 @@ interface CommonInput {
 
 /* ------------------------------------------------------------------ FDM */
 
-export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: Translate): Estimate {
-  const { stats, printer, material, settings, params } = input
-  const qp = (n: number) => (n > 1 ? t('cost.detail.qtyPrefix', { qty: n }) : '')
+/** Tek parçanın FDM üretim modeli: katman başına ekstrüzyon süresi, gram, destek. Tabla süresi bundan türetilir. */
+export interface FdmPartModel {
+  /** Parçanın dilim katmanı başına tek kopya ekstrüzyon süresi (sn), min. katman süresi uygulanmadan */
+  layerExtrude: Float64Array
+  /** Dilim katman kalınlığı (kabalaştırılmış olabilir) */
+  lh: number
+  /** Parametre katman kalınlığında katman sayısı */
+  layerCount: number
+  supportTimeSec: number
+  partGrams: number
+  supportGrams: number
+  /** Dilimleyici verisi: parça başına süre (iş başlangıcı hariç), sn; yoksa null */
+  slicerPerPartSec: number | null
+  basis: Estimate['basis']
+  footprint: number
+  modelVolume: number
+  supportVolume: number
+  wallVolume: number
+  skinVolume: number
+  infillVolume: number
+}
+
+export interface FdmPlateContext {
+  printer: PrinterProfile
+  material: Material
+  params: FdmPrintParams
+  settings: BusinessSettings
+  calibration?: CalibrationFactors | null
+}
+
+const fdmLayerH = (params: FdmPrintParams) => Math.max(0.01, Number.isFinite(params.layerHeight) ? params.layerHeight : 0.2)
+
+export function fdmPartModel(input: CommonInput & { params: FdmPrintParams }): FdmPartModel {
+  const { stats, printer, material, params } = input
   const spec = printer.spec as FdmPrinterSpec
-  const warnings: string[] = []
   const L = stats.layers
-  const qty = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number.isFinite(settings.quantity) ? settings.quantity : 1)))
-  const layerH = Math.max(0.01, Number.isFinite(params.layerHeight) ? params.layerHeight : 0.2)
+  const layerH = fdmLayerH(params)
   const layerCount = Math.max(1, Math.ceil(stats.size.z / layerH - 1e-6))
 
   // --- Malzeme (tek parça): kabuk + dolgu ---
@@ -147,7 +176,7 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
   const calib = !useSlicer && input.calibration && input.calibration.samples > 0 ? input.calibration : null
   // Dilimleyici gramı destek ve purge'ü içerir → destek 0, model = dosya değeri; aksi halde model tahmini × kalibrasyon
   const partGrams = useSlicer ? input.slicer!.partGrams : gramsFromMm3(modelVolume, material.density) * (calib?.gramsFactor ?? 1)
-  const partSupportGrams = useSlicer ? 0 : gramsFromMm3(supportVolume, material.density) * (calib?.gramsFactor ?? 1)
+  const supportGrams = useSlicer ? 0 : gramsFromMm3(supportVolume, material.density) * (calib?.gramsFactor ?? 1)
 
   // --- Efektif akış ---
   const qMax = Math.min(material.maxFlow, spec.maxFlow)
@@ -159,42 +188,97 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
   const wallPerLayerFactor = wallThickness * shellScale
   const bulkShare = (skinVolume + infillVolume) / Math.max(1e-9, modelVolume)
   const lh = L.layerHeight
-  // Katman başına tek parça ekstrüzyon süresi (min. katman süresi uygulanmadan)
   const layerExtrude = new Float64Array(L.layerCount)
   for (let i = 0; i < L.layerCount; i++) {
     const wallV = Math.min(L.perimeter[i] * wallPerLayerFactor, L.area[i]) * lh
     const bulkV = Math.max(0, L.area[i] * lh - wallV) * bulkShare
     layerExtrude[i] = wallV / qWall + bulkV / qBulk
   }
-  const minLayer = Math.max(0, material.minLayerTime) * (lh / layerH)
-  const supportTimePart = supportVolume / qBulk
+  return {
+    layerExtrude, lh, layerCount, supportTimeSec: supportVolume / qBulk, partGrams, supportGrams,
+    slicerPerPartSec: useSlicer ? Math.max(0, input.slicer!.partTimeSec - spec.jobOverheadSec) : null,
+    basis: useSlicer ? 'slicer' : calib ? 'calibrated' : 'model',
+    footprint: stats.size.x * stats.size.y, modelVolume, supportVolume, wallVolume, skinVolume, infillVolume,
+  }
+}
+
+/** Tabla başına renk değişimi / nozul değişimi sayıları (katman sayısına göre) */
+export function fdmColorEvents(spec: FdmPrinterSpec, params: FdmPrintParams, layerCount: number): { colorChanges: number; nozzleSwitches: number } {
   // Renk değişimleri tabla başına: her katmanda yapılır, parça sayısından bağımsız.
   // Çift nozulda katman başına ilk geçiş nozul değişimidir (flush yok); kalan geçişler AMS flush.
   const changesPerLayer = params.colorCount > 1 ? params.colorChangesPerLayer * (params.colorCount - 1) : 0
   const switchPerLayer = spec.dualNozzle && params.colorCount > 1 ? Math.min(changesPerLayer, params.colorChangesPerLayer) : 0
   const nozzleSwitches = Math.round(layerCount * switchPerLayer)
-  const colorChangesPlate = Math.round(layerCount * (changesPerLayer - switchPerLayer))
+  const colorChanges = Math.round(layerCount * (changesPerLayer - switchPerLayer))
+  return { colorChanges, nozzleSwitches }
+}
 
-  /** k parçalı bir tablanın süresi (sn) */
-  const plateTime = (k: number) => {
+/**
+ * Karışık bir tablanın süresi (sn): her parçadan k kopya. Katman başına ekstrüzyon toplanır; soğutma tabanı
+ * (min. katman süresi) katman toplamına uygulanır (küçük parçalar partide daha verimli). Parametre katman
+ * kalınlığı ızgarasına yeniden örneklenir; kabalaştırılmış dilimler doğrusal ölçeklenir.
+ */
+export function fdmPlateTime(parts: { m: FdmPartModel; k: number }[], ctx: FdmPlateContext): number {
+  const spec = ctx.printer.spec as FdmPrinterSpec
+  const layerH = fdmLayerH(ctx.params)
+  const calib = ctx.calibration && ctx.calibration.samples > 0 ? ctx.calibration : null
+  const K = parts.reduce((s, p) => s + p.k, 0)
+  // Parçalar arası travel: ≤3 parçada ihmal, 10+ parçada baskı süresinin ~%2–5'i
+  const travelFactor = K > 3 ? Math.min(0.05, 0.006 * (K - 3)) : 0
+  const modelParts = parts.filter((p) => p.m.slicerPerPartSec == null && p.k > 0)
+  const slicerT = parts.filter((p) => p.m.slicerPerPartSec != null).reduce((s, p) => s + p.m.slicerPerPartSec! * p.k, 0)
+  let t = 0
+  if (modelParts.length > 0) {
+    const layerCount = Math.max(...modelParts.map((p) => p.m.layerCount))
+    const minLayer = Math.max(0, ctx.material.minLayerTime)
     let extrude = 0
-    for (let i = 0; i < L.layerCount; i++) {
-      // Aynı katmanda k parça: soğutma tabanı katman toplamına uygulanır (küçük parçalar partide daha verimli)
-      extrude += Math.max(layerExtrude[i] * k, minLayer)
+    if (modelParts.length === 1 && Math.abs(modelParts[0].m.lh - layerH) < 1e-9) {
+      // Hızlı yol: tek parça, dilim ızgarası = parametre ızgarası
+      const { m, k } = modelParts[0]
+      for (let i = 0; i < m.layerExtrude.length; i++) extrude += Math.max(m.layerExtrude[i] * k, minLayer)
+    } else {
+      const fine = Math.max(...modelParts.map((p) => Math.ceil(p.m.layerExtrude.length * p.m.lh / layerH - 1e-6)))
+      for (let j = 0; j < fine; j++) {
+        let e = 0
+        for (const { m, k } of modelParts) {
+          const idx = Math.floor((j * layerH) / m.lh + 1e-9)
+          if (idx < m.layerExtrude.length) e += m.layerExtrude[idx] * (layerH / m.lh) * k
+        }
+        if (e > 0) extrude += Math.max(e, minLayer)
+      }
     }
-    // Parçalar arası travel: ≤3 parçada ihmal, 10+ parçada baskı süresinin ~%2–5'i
-    const travelFactor = k > 3 ? Math.min(0.05, 0.006 * (k - 3)) : 0
-    const t = (extrude + k * supportTimePart) * (1 + travelFactor) + layerCount * spec.layerChangeSec
-      + colorChangesPlate * spec.colorChangeTimeSec + nozzleSwitches * (spec.nozzleSwitchTimeSec ?? 0)
-    if (useSlicer) {
-      // Dilimleyici süresi tek parça için (iş başlangıcı dahil); k parça: başlangıç bir kez, baskı süresi k kat
-      const perPart = Math.max(0, input.slicer!.partTimeSec - spec.jobOverheadSec)
-      return spec.jobOverheadSec + perPart * k * (1 + travelFactor)
-    }
-    return spec.jobOverheadSec + t * settings.timeMultiplier * (calib?.timeFactor ?? 1)
+    const support = modelParts.reduce((s, p) => s + p.k * p.m.supportTimeSec, 0)
+    const ev = fdmColorEvents(spec, ctx.params, layerCount)
+    t = (extrude + support) * (1 + travelFactor) + layerCount * spec.layerChangeSec
+      + ev.colorChanges * spec.colorChangeTimeSec + ev.nozzleSwitches * (spec.nozzleSwitchTimeSec ?? 0)
   }
-  const plateWasteGrams = spec.jobWasteGrams + colorChangesPlate * spec.colorChangeWasteGrams + nozzleSwitches * (spec.nozzleSwitchWasteGrams ?? 0)
-  const plateEnergyKWh = (t: number) => ((t - spec.jobOverheadSec) / 3600 * spec.avgPowerW * material.powerFactor + (spec.jobOverheadSec / 3600) * spec.heatupPowerW) / 1000
+  return spec.jobOverheadSec + t * ctx.settings.timeMultiplier * (calib?.timeFactor ?? 1) + slicerT * (1 + travelFactor)
+}
+
+/** Tabla başına sabit israf (purge hattı + renk/nozul değişimleri), g */
+export function fdmPlateWaste(spec: FdmPrinterSpec, params: FdmPrintParams, layerCount: number): number {
+  const ev = fdmColorEvents(spec, params, layerCount)
+  return spec.jobWasteGrams + ev.colorChanges * spec.colorChangeWasteGrams + ev.nozzleSwitches * (spec.nozzleSwitchWasteGrams ?? 0)
+}
+
+export function fdmPlateEnergyKWh(spec: FdmPrinterSpec, material: Material, plateSec: number): number {
+  return ((plateSec - spec.jobOverheadSec) / 3600 * spec.avgPowerW * material.powerFactor + (spec.jobOverheadSec / 3600) * spec.heatupPowerW) / 1000
+}
+
+export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: Translate): Estimate {
+  const { stats, printer, material, settings, params } = input
+  const qp = (n: number) => (n > 1 ? t('cost.detail.qtyPrefix', { qty: n }) : '')
+  const spec = printer.spec as FdmPrinterSpec
+  const warnings: string[] = []
+  const qty = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number.isFinite(settings.quantity) ? settings.quantity : 1)))
+  const m = fdmPartModel(input)
+  const { layerCount, partGrams, supportGrams: partSupportGrams, modelVolume, supportVolume, wallVolume, skinVolume, infillVolume } = m
+  const ctx: FdmPlateContext = { printer, material, params, settings, calibration: input.calibration }
+  const plateTime = (k: number) => fdmPlateTime([{ m, k }], ctx)
+  const ev = fdmColorEvents(spec, params, layerCount)
+  const colorChangesPlate = ev.colorChanges, nozzleSwitches = ev.nozzleSwitches
+  const plateWasteGrams = fdmPlateWaste(spec, params, layerCount)
+  const plateEnergyKWh = (sec: number) => fdmPlateEnergyKWh(spec, material, sec)
 
   // --- Tabla planı ---
   const layoutInfo = plateLayout(stats, printer, settings.fdmPartSpacingMm, settings.plateMarginMm)
@@ -222,7 +306,7 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
 
   return finalize({
     t,
-    basis: useSlicer ? 'slicer' : calib ? 'calibrated' : 'model',
+    basis: m.basis,
     tech: 'fdm', stats, printer, settings, lines, warnings, qty, partsPerPlate, plates, marginViolated: layoutInfo.marginViolated, thinness: input.thinness,
     single: { printTimeSec: singleTime, materialGrams: partGrams + partSupportGrams + plateWasteGrams },
     plateTimeSec: fullPlateTime,
@@ -233,6 +317,22 @@ export function estimateFdm(input: CommonInput & { params: FdmPrintParams }, t: 
 }
 
 /* ---------------------------------------------------------------- Resin */
+
+/** Reçine tabla süresi: katman sayısına bağlı, parça sayısından bağımsız.
+ *  Statik ayırmalı makinelerde kaplama arttıkça rest/lift yavaşlatması: ×(1 + ceza × kaplama), üst sınır +%30. */
+export function resinPlateTime(plate: { layerCount: number; fill: number }, ctx: { printer: PrinterProfile; params: ResinPrintParams; settings: BusinessSettings; calibration?: CalibrationFactors | null }): number {
+  const spec = ctx.printer.spec as ResinPrinterSpec
+  const { params, settings } = ctx
+  const calib = ctx.calibration && ctx.calibration.samples > 0 ? ctx.calibration : null
+  const penalty = spec.tiltRelease ? 0 : Math.min(0.3, settings.resinLiftAreaPenalty * Math.min(1, Math.max(0, plate.fill)))
+  const bottom = Math.min(params.bottomLayers, plate.layerCount)
+  const normal = plate.layerCount - bottom
+  const layersTime = bottom * (params.bottomExposureSec + params.liftCycleSec) + normal * (params.exposureSec + params.liftCycleSec)
+  return 60 + layersTime * (1 + penalty) * settings.timeMultiplier * (calib?.timeFactor ?? 1)
+}
+export function resinPlateEnergyKWh(spec: ResinPrinterSpec, settings: BusinessSettings, plateSec: number): number {
+  return ((plateSec / 3600) * spec.avgPowerW + (settings.resinPostMinutes / 60) * spec.postPowerW) / 1000
+}
 
 export function estimateResin(input: CommonInput & { params: ResinPrintParams }, t: Translate): Estimate {
   const { stats, printer, material, settings, params } = input
@@ -274,18 +374,9 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
   const plates = plan.plates
   const plateArea = printer.bed.x * printer.bed.y
 
-  /** k parçalı tabla süresi: katman sayısına bağlı, parça sayısından bağımsız.
-   *  Statik ayırmalı makinelerde kaplama arttıkça rest/lift yavaşlatması: ×(1 + ceza × kaplama), üst sınır +%30. */
-  const plateTime = (k: number) => {
-    const fill = Math.min(1, (k * footprint) / plateArea)
-    const penalty = spec.tiltRelease ? 0 : Math.min(0.3, settings.resinLiftAreaPenalty * fill)
-    const bottom = Math.min(params.bottomLayers, layerCount)
-    const normal = layerCount - bottom
-    const layersTime = bottom * (params.bottomExposureSec + params.liftCycleSec) + normal * (params.exposureSec + params.liftCycleSec)
-    return 60 + layersTime * (1 + penalty) * settings.timeMultiplier * (calib?.timeFactor ?? 1)
-  }
+  const plateTime = (k: number) => resinPlateTime({ layerCount, fill: Math.min(1, (k * footprint) / plateArea) }, { printer, params, settings, calibration: input.calibration })
   const totalTime = sumPlates(plan, plateTime)
-  const totalEnergy = sumPlates(plan, (k) => ((plateTime(k) / 3600) * spec.avgPowerW + (settings.resinPostMinutes / 60) * spec.postPowerW) / 1000)
+  const totalEnergy = sumPlates(plan, (k) => resinPlateEnergyKWh(spec, settings, plateTime(k)))
   const fullPlateTime = plateTime(Math.min(qty, Math.max(1, partsPerPlate)))
   const singleTime = plateTime(1)
 
@@ -322,17 +413,11 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
 
 /* ------------------------------------------------------------- ortak son */
 
-function finalize(a: {
-  t: Translate
-  basis: Estimate['basis']
-  tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings
-  lines: CostLine[]; warnings: string[]; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean
-  thinness?: { fraction: number; thresholdMm: number; p5: number } | null
-  single: { printTimeSec: number; materialGrams: number }; plateTimeSec: number
-  totals: Omit<EstimateTotals, 'cost' | 'price' | 'priceWithVat'>
-  materialVolumeMm3: number; layerCount: number; breakdown: Record<string, number>
-}): Estimate {
-  const { t, settings, stats, printer, qty } = a
+/** Maliyet kalemlerinden fiyat: başarısızlık payı, ambalaj, kâr, kademeli indirim, minimum tutar, KDV, teslim süresi */
+export function priceLines(a: { t: Translate; tech: Tech; settings: BusinessSettings; lines: CostLine[]; qty: number; printTimeSec: number }): {
+  lines: CostLine[]; cost: number; price: number; priceWithVat: number; discountPct: number; leadDays: number
+} {
+  const { t, settings, qty } = a
   const lines = [...a.lines]
   const direct = lines.reduce((s, l) => s + l.amount, 0)
   const fr = a.tech === 'resin' ? settings.resinFailureRate : settings.failureRate
@@ -349,11 +434,16 @@ function finalize(a: {
   if (price < settings.minimumPriceTRY) price = settings.minimumPriceTRY
   // Teslim süresi: toplam makine süresi ÷ (yazıcı × günlük saat) + 1 gün hazırlık/son işlem
   const capacityH = Math.max(1, settings.printerCount || 1) * Math.max(1, settings.workHoursPerDay || 20)
-  const leadDays = Math.max(1, Math.ceil(a.totals.printTimeSec / 3600 / capacityH) + 1)
+  const leadDays = Math.max(1, Math.ceil(a.printTimeSec / 3600 / capacityH) + 1)
   const priceWithVat = price * (1 + settings.vat)
+  return { lines, cost, price, priceWithVat, discountPct, leadDays }
+}
 
+/** Geometriye bağlı uyarılar (sığma, kenar payı, manifold, DFM) */
+export function geometryWarnings(a: { t: Translate; tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean; thinness?: { fraction: number; thresholdMm: number; p5: number } | null }): string[] {
+  const { t, settings, stats, printer, qty } = a
   const fit = checkFit(stats, printer)
-  const warnings = [...a.warnings]
+  const warnings: string[] = []
   if (!fit.fits && fit.fitsRotated) warnings.push(t('cost.warn.rotatedFit'))
   if (a.marginViolated) warnings.push(t('cost.warn.marginTight', { m: settings.plateMarginMm }))
   if (fit.fitsRotated && qty > a.partsPerPlate) warnings.push(t('cost.warn.multiPlate', { qty, n: a.partsPerPlate, p: a.plates }))
@@ -372,6 +462,23 @@ function finalize(a: {
   if (a.thinness && a.thinness.fraction >= 0.03) warnings.push(t('cost.warn.thinWalls', { pct: Math.round(a.thinness.fraction * 100), th: a.thinness.thresholdMm.toFixed(1), p5: a.thinness.p5.toFixed(2) }))
   if (stats.layers.coarsened) warnings.push(t('cost.warn.coarsened'))
 
+  return warnings
+}
+
+function finalize(a: {
+  t: Translate
+  basis: Estimate['basis']
+  tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings
+  lines: CostLine[]; warnings: string[]; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean
+  thinness?: { fraction: number; thresholdMm: number; p5: number } | null
+  single: { printTimeSec: number; materialGrams: number }; plateTimeSec: number
+  totals: Omit<EstimateTotals, 'cost' | 'price' | 'priceWithVat'>
+  materialVolumeMm3: number; layerCount: number; breakdown: Record<string, number>
+}): Estimate {
+  const { stats, printer, qty } = a
+  const { lines, cost, price, priceWithVat, discountPct, leadDays } = priceLines({ t: a.t, tech: a.tech, settings: a.settings, lines: a.lines, qty, printTimeSec: a.totals.printTimeSec })
+  const fit = checkFit(stats, printer)
+  const warnings = [...a.warnings, ...geometryWarnings(a)]
   const total: EstimateTotals = { ...a.totals, cost, price, priceWithVat }
   const perUnit: EstimateTotals = {
     materialGrams: total.materialGrams / qty, supportGrams: total.supportGrams / qty, wasteGrams: total.wasteGrams / qty,

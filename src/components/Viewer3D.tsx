@@ -2,35 +2,45 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { effectiveScale, type Placement, type Vec3 } from '../lib/mesh/types.ts'
-import type { PlateLayout } from '../lib/cost/engine.ts'
 
-interface Props {
-  positions: Float32Array | null
-  overhangMask: Uint8Array | null
-  /** İnce duvar bayrağı (üçgen başına), kırmızı boyanır */
-  thinMask?: Uint8Array | null
+/** Sahnede çizilecek bir parça (görüntü konumları + yerleşim + renk maskeleri) */
+export interface ViewerPart {
+  key: string
+  positions: Float32Array
   placement: Placement
-  /** Modelin yerleştirilmiş bounding box'ı (mm) — bed ortalaması için */
+  /** Yerleştirilmiş bounding box (mm) — tabla merkezleme için; analiz bitmeden null */
   bboxMin: Vec3 | null
   bboxMax: Vec3 | null
+  overhangMask: Uint8Array | null
+  thinMask: Uint8Array | null
+  /** Etkin parça hafif vurgulanır */
+  active?: boolean
+}
+/** Tabla üzerindeki bir kopya: parça indeksi ve bounding box merkezinin tabla koordinatı (mm) */
+export interface ViewerInstance { part: number; x: number; y: number; rotated: boolean }
+
+interface Props {
+  parts: ViewerPart[]
+  instances: ViewerInstance[]
   bed: { x: number; y: number; z: number; shape?: 'rect' }
   fits: boolean
-  /** Gösterilecek kopya sayısı ve tabla yerleşimi (adet > 1) */
-  copies: number
-  layout: PlateLayout | null
   /** Açık zeminli PNG yakalama fonksiyonu buraya yazılır */
   captureRef?: MutableRefObject<(() => string | null) | null>
 }
 
 const COLOR_NORMAL = new THREE.Color('#60a5fa')
+const COLOR_DIM = new THREE.Color('#7dd3fc')
 const COLOR_OVERHANG = new THREE.Color('#f97316')
 const COLOR_BED = new THREE.Color('#22c55e')
 const COLOR_THIN = new THREE.Color('#ef4444')
-const MAX_INSTANCES = 400
+export const MAX_INSTANCES = 400
+/** Parça sırasına göre hafif renk ayrımı (projede parçaları ayırt etmek için) */
+const PART_TINTS = ['#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#f472b6', '#22d3ee', '#fb923c', '#a3e635']
 
-export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin, bboxMax, bed, fits, copies, layout, captureRef }: Props) {
+interface PartEntry { positions: Float32Array; mesh: THREE.InstancedMesh }
+
+export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
-  const colorVersion = useRef(-1)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
     scene: THREE.Scene
@@ -39,7 +49,7 @@ export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin
     root: THREE.Group   // Z-up → Y-up dönüşümü
     bedGroup: THREE.Group
     modelGroup: THREE.Group
-    mesh: THREE.InstancedMesh | null
+    entries: Map<string, PartEntry>
     plate: THREE.Mesh | null
   } | null>(null)
 
@@ -74,7 +84,7 @@ export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin
     const modelGroup = new THREE.Group()
     root.add(bedGroup, modelGroup)
 
-    sceneRef.current = { renderer, scene, camera, controls, root, bedGroup, modelGroup, mesh: null, plate: null }
+    sceneRef.current = { renderer, scene, camera, controls, root, bedGroup, modelGroup, entries: new Map(), plate: null }
 
     let raf = 0
     const loop = () => {
@@ -96,6 +106,8 @@ export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      const s = sceneRef.current
+      if (s) for (const e of s.entries.values()) { e.mesh.geometry.dispose(); (e.mesh.material as THREE.Material).dispose() }
       controls.dispose()
       renderer.dispose()
       el.removeChild(renderer.domElement)
@@ -118,7 +130,6 @@ export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin
     const grid = new THREE.GridHelper(Math.max(x, y), Math.round(Math.max(x, y) / 10), 0x475569, 0x1f2937)
     grid.rotation.x = Math.PI / 2 // Z-up düzleme
     grid.position.set(x / 2, y / 2, 0)
-    // Kare grid'i tablaya kırp: basit yaklaşım — plaka çiz
     const plate = new THREE.Mesh(
       new THREE.PlaneGeometry(x, y),
       new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.9, side: THREE.DoubleSide }),
@@ -141,110 +152,114 @@ export function Viewer3D({ positions, overhangMask, thinMask, placement, bboxMin
     s.camera.updateProjectionMatrix()
   }, [bed.x, bed.y, bed.z, fits, bed])
 
-  // Model geometrisi: yalnızca konumlar değişince yeniden kurulur
+  // Geometri: her parça için bir InstancedMesh; yalnızca konumları değişen/eklenen/kaldırılan parçalar yeniden kurulur
   useEffect(() => {
     const s = sceneRef.current
     if (!s) return
-    if (s.mesh) {
-      s.modelGroup.remove(s.mesh)
-      s.mesh.geometry.dispose()
-      ;(s.mesh.material as THREE.Material).dispose()
-      s.mesh = null
-    }
-    if (!positions || positions.length === 0) return
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.computeVertexNormals()
-    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(positions.length), 3))
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide })
-    const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
-    mesh.count = 1
-    mesh.frustumCulled = false
-    s.modelGroup.add(mesh)
-    s.mesh = mesh
-    colorVersion.current = -1 // renkler yeniden yazılsın
-  }, [positions])
-
-  // Sarkma renkleri: yalnızca renk özniteliği güncellenir (geometri yeniden kurulmaz)
-  useEffect(() => {
-    const s = sceneRef.current
-    if (!s || !s.mesh) return
-    const attr = s.mesh.geometry.getAttribute('color') as THREE.BufferAttribute
-    const colors = attr.array as Float32Array
-    const triCount = colors.length / 9
-    const maskOk = overhangMask && overhangMask.length === triCount ? overhangMask : null
-    const thinOk = thinMask && thinMask.length === triCount ? thinMask : null
-    for (let t = 0; t < triCount; t++) {
-      const m = maskOk ? maskOk[t] : 0
-      const c = thinOk && thinOk[t] ? COLOR_THIN : m === 1 ? COLOR_OVERHANG : m === 2 ? COLOR_BED : COLOR_NORMAL
-      for (let k = 0; k < 3; k++) {
-        colors[t * 9 + k * 3] = c.r
-        colors[t * 9 + k * 3 + 1] = c.g
-        colors[t * 9 + k * 3 + 2] = c.b
+    const keep = new Set(parts.map((p) => p.key))
+    for (const [key, e] of s.entries) {
+      const p = parts.find((x) => x.key === key)
+      if (!p || p.positions !== e.positions || p.positions.length === 0) {
+        s.modelGroup.remove(e.mesh); e.mesh.geometry.dispose(); (e.mesh.material as THREE.Material).dispose(); s.entries.delete(key)
       }
     }
-    attr.needsUpdate = true
-  }, [positions, overhangMask, thinMask])
+    for (const p of parts) {
+      if (!keep.has(p.key) || s.entries.has(p.key) || p.positions.length === 0) continue
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute('position', new THREE.BufferAttribute(p.positions, 3))
+      geo.computeVertexNormals()
+      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(p.positions.length), 3))
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide })
+      const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES)
+      mesh.count = 0
+      mesh.frustumCulled = false
+      s.modelGroup.add(mesh)
+      s.entries.set(p.key, { positions: p.positions, mesh })
+    }
+  }, [parts])
 
-  // Yerleşim: döndürme/ölçek + tabla ızgarası (adet kopyaları) + kamera odağı
+  // Renkler: sarkma / tabla teması / ince duvar; projede parça başına hafif ton
   useEffect(() => {
     const s = sceneRef.current
-    if (!s || !s.mesh) return
+    if (!s) return
+    const multi = parts.length > 1
+    parts.forEach((p, idx) => {
+      const e = s.entries.get(p.key)
+      if (!e) return
+      // Maskeler worker'dan yeni dizi olarak gelir; her seferinde yazmak ucuz (O(üçgen)), önbellek tutulmaz
+      const attr = e.mesh.geometry.getAttribute('color') as THREE.BufferAttribute
+      const colors = attr.array as Float32Array
+      const triCount = colors.length / 9
+      const maskOk = p.overhangMask && p.overhangMask.length === triCount ? p.overhangMask : null
+      const thinOk = p.thinMask && p.thinMask.length === triCount ? p.thinMask : null
+      const base = multi ? new THREE.Color(PART_TINTS[idx % PART_TINTS.length]) : COLOR_NORMAL
+      const normal = multi && !p.active ? base.clone().lerp(COLOR_DIM, 0.15) : base
+      for (let t = 0; t < triCount; t++) {
+        const m = maskOk ? maskOk[t] : 0
+        const c = thinOk && thinOk[t] ? COLOR_THIN : m === 1 ? COLOR_OVERHANG : m === 2 ? COLOR_BED : normal
+        for (let k = 0; k < 3; k++) {
+          colors[t * 9 + k * 3] = c.r
+          colors[t * 9 + k * 3 + 1] = c.g
+          colors[t * 9 + k * 3 + 2] = c.b
+        }
+      }
+      attr.needsUpdate = true
+    })
+  }, [parts])
+
+  // Yerleşim: her kopya için T(tabla konumu)·Rz(90°?)·T(-bbox merkezi)·R(yerleşim)·S(ölçek) + kamera odağı
+  useEffect(() => {
+    const s = sceneRef.current
+    if (!s) return
     const DEG = Math.PI / 180
-    const base = new THREE.Matrix4().compose(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(placement.rotX * DEG, placement.rotY * DEG, placement.rotZ * DEG, 'ZYX') /* analyze.ts: R = Rz·Ry·Rx */),
-      new THREE.Vector3().setScalar(effectiveScale(placement)),
-    )
-    s.modelGroup.position.set(0, 0, 0)
-    if (!bboxMin || !bboxMax) {
-      s.mesh.count = 1
-      s.mesh.setMatrixAt(0, base)
-      s.mesh.instanceMatrix.needsUpdate = true
-      return
-    }
-    const bcx = (bboxMin.x + bboxMax.x) / 2, bcy = (bboxMin.y + bboxMax.y) / 2
-    const h = bboxMax.z - bboxMin.z
-    const toOrigin = new THREE.Matrix4().makeTranslation(-bcx, -bcy, -bboxMin.z)
-    const shown = layout && layout.capacity > 0 ? Math.min(copies, layout.capacity, MAX_INSTANCES) : 1
     const tmp = new THREE.Matrix4()
-    if (!layout || shown <= 1) {
-      // Tek parça: tabla merkezi
-      tmp.makeTranslation(bed.x / 2, bed.y / 2, 0).multiply(toOrigin).multiply(base)
-      s.mesh.setMatrixAt(0, tmp)
-      s.mesh.count = 1
-    } else {
-      const rot = new THREE.Matrix4().makeRotationZ(layout.rotated ? Math.PI / 2 : 0)
-      const cols = Math.max(1, layout.cols)
-      const rowsUsed = Math.ceil(shown / cols)
-      const colsUsed = Math.min(cols, shown)
-      const gridW = colsUsed * layout.cellX + (colsUsed - 1) * layout.spacing
-      const gridH = rowsUsed * layout.cellY + (rowsUsed - 1) * layout.spacing
-      const x0 = (bed.x - gridW) / 2 + layout.cellX / 2
-      const y0 = (bed.y - gridH) / 2 + layout.cellY / 2
-      for (let i = 0; i < shown; i++) {
-        const c = i % cols, r = Math.floor(i / cols)
-        tmp.makeTranslation(x0 + c * (layout.cellX + layout.spacing), y0 + r * (layout.cellY + layout.spacing), 0)
-          .multiply(rot).multiply(toOrigin).multiply(base)
-        s.mesh.setMatrixAt(i, tmp)
+    let maxH = 0, focusW = 0
+    const single = instances.length <= 1
+    parts.forEach((p, idx) => {
+      const e = s.entries.get(p.key)
+      if (!e) return
+      const base = new THREE.Matrix4().compose(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(p.placement.rotX * DEG, p.placement.rotY * DEG, p.placement.rotZ * DEG, 'ZYX') /* analyze.ts: R = Rz·Ry·Rx */),
+        new THREE.Vector3().setScalar(effectiveScale(p.placement)),
+      )
+      const mine = instances.filter((i) => i.part === idx).slice(0, MAX_INSTANCES)
+      if (!p.bboxMin || !p.bboxMax) {
+        // Analiz bitmeden: tabla merkezinde ham konum (yalnızca tek kopya)
+        e.mesh.count = mine.length > 0 || single ? 1 : 0
+        if (e.mesh.count) e.mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(bed.x / 2, bed.y / 2, 0).multiply(base))
+        e.mesh.instanceMatrix.needsUpdate = true
+        return
       }
-      s.mesh.count = shown
-    }
-    s.mesh.instanceMatrix.needsUpdate = true
+      const bcx = (p.bboxMin.x + p.bboxMax.x) / 2, bcy = (p.bboxMin.y + p.bboxMax.y) / 2
+      const h = p.bboxMax.z - p.bboxMin.z
+      maxH = Math.max(maxH, h)
+      focusW = Math.max(focusW, p.bboxMax.x - p.bboxMin.x, p.bboxMax.y - p.bboxMin.y)
+      const toOrigin = new THREE.Matrix4().makeTranslation(-bcx, -bcy, -p.bboxMin.z)
+      const rot90 = new THREE.Matrix4().makeRotationZ(Math.PI / 2)
+      mine.forEach((inst, i) => {
+        tmp.makeTranslation(inst.x, inst.y, 0)
+        if (inst.rotated) tmp.multiply(rot90)
+        tmp.multiply(toOrigin).multiply(base)
+        e.mesh.setMatrixAt(i, tmp)
+      })
+      e.mesh.count = mine.length
+      e.mesh.instanceMatrix.needsUpdate = true
+    })
 
     // Kamerayı sahneye odakla (tek parça: modele; çoklu: tablaya)
-    const focus = shown > 1 ? Math.max(bed.x, bed.y, h) : Math.max(bboxMax.x - bboxMin.x, bboxMax.y - bboxMin.y, h)
-    const d = Math.max(focus * (shown > 1 ? 2.4 : 3.2), 120)
-    s.controls.target.set(bed.x / 2, h / 2, -bed.y / 2)
-    s.camera.position.set(bed.x / 2 + d * 0.6, h / 2 + d * 0.45, -bed.y / 2 + d * 0.6)
-  }, [placement, bboxMin, bboxMax, bed.x, bed.y, positions, copies, layout])
+    const focus = single ? Math.max(focusW, maxH) : Math.max(bed.x, bed.y, maxH)
+    const d = Math.max(focus * (single ? 3.2 : 2.4), 120)
+    s.controls.target.set(bed.x / 2, maxH / 2, -bed.y / 2)
+    s.camera.position.set(bed.x / 2 + d * 0.6, maxH / 2 + d * 0.45, -bed.y / 2 + d * 0.6)
+  }, [parts, instances, bed.x, bed.y])
 
   // Teklif PDF'i için açık zeminli görüntü yakalama
   useEffect(() => {
     if (!captureRef) return
     captureRef.current = () => {
       const s = sceneRef.current
-      if (!s || !s.mesh) return null
+      if (!s || s.entries.size === 0) return null
       const plateMat = s.plate?.material as THREE.MeshBasicMaterial | undefined
       const oldPlate = plateMat?.color.clone()
       const oldOpacity = plateMat?.opacity

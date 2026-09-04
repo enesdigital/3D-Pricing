@@ -8,7 +8,8 @@ import { analyzeMesh, transformPositions } from '../lib/mesh/analyze.ts'
 import { computeThickness } from '../lib/mesh/thickness.ts'
 import type { WorkerRequest, WorkerResponse } from '../lib/mesh/types.ts'
 
-let original: Float32Array | null = null
+/** Parça kimliği → orijinal (sadeleştirilmemiş) konumlar; çok parçalı projede hepsi burada tutulur */
+const models = new Map<string, Float32Array>()
 
 const post = (msg: WorkerResponse, transfer?: Transferable[]) =>
   (self as unknown as Worker).postMessage(msg, transfer ?? [])
@@ -21,11 +22,11 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
   const msg = ev.data
   try {
     if (msg.type === 'unload') {
-      original = null
+      if (msg.partId) models.delete(msg.partId); else models.clear()
       return
     }
     if (msg.type === 'load') {
-      original = null
+      models.delete(msg.partId)
       const ext = msg.fileName.toLowerCase().split('.').pop()
       const onProgress = (f: number) => post({ type: 'progress', id: msg.id, phase: 'parse', fraction: f })
       let unit = 1, colorHint: number | null = null, objectCount = 1
@@ -34,7 +35,7 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
       else if (ext === 'step' || ext === 'stp' || ext === 'iges' || ext === 'igs' || ext === 'brep' || ext === 'brp') parsed = await parseStep(msg.buffer, msg.fileName, onProgress)
       else if (ext === 'obj') parsed = parseObj(msg.buffer, onProgress)
       else parsed = parseStl(msg.buffer, onProgress)
-      original = parsed.positions
+      models.set(msg.partId, parsed.positions)
       // Render için kopya (çok büyük mesh'te sadeleştirilmiş); orijinal worker'da kalır.
       const DISPLAY_MAX = 1_500_000
       const copy = parsed.triangleCount > DISPLAY_MAX ? await decimateForDisplay(parsed.positions, 1_000_000) : parsed.positions.slice()
@@ -42,6 +43,7 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
       return
     }
     if (msg.type === 'analyze') {
+      const original = models.get(msg.partId)
       if (!original) throw new Error('Önce bir model yüklenmeli.')
       const placed = transformPositions(original, msg.placement)
       const result = analyzeMesh(placed, {

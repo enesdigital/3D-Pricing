@@ -31,6 +31,8 @@ export interface QuoteInput {
   logo: QuoteImage | null
   modelImage: QuoteImage | null
   includeProduction: boolean
+  /** Çok parçalı proje: parça listesi (varsa model satırı ve hizmet açıklaması proje olarak yazılır) */
+  parts?: { name: string; quantity: number; size: { x: number; y: number; z: number }; unitPrice: number; total: number }[]
 }
 
 export interface QuoteFonts { regular: string; bold: string } // base64 TTF
@@ -130,16 +132,21 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
   const quality = isFdm
     ? t('pdf.qualityFdm', { lh: fp.layerHeight, walls: fp.wallLoops, infill: Math.round(fp.infillDensity * 100) })
     : t('pdf.qualityResin', { lh: rp.layerHeight }) + (rp.hollow ? t('pdf.qualityResinHollow') : '')
-  const rows: [string, string][] = [
+  const parts = q.parts && q.parts.length > 1 ? q.parts : null
+  const rows: [string, string][] = parts ? [
+    [t('pdf.rowProject'), t('pdf.projectModel', { n: parts.length, names: parts.map((p) => p.name).join(', ') })],
+  ] : [
     [t('pdf.rowModel'), `${q.fileName}`],
     [t('pdf.rowSize'), `${num(stats.size.x)} × ${num(stats.size.y)} × ${num(stats.size.z)} mm${q.placement.scalePct !== 100 ? t('pdf.scale', { n: num(q.placement.scalePct, 1) }) : ''}`],
+  ]
+  rows.push(
     [t('pdf.rowTech'), `${isFdm ? t('pdf.techFdm') : t('pdf.techResin')} · ${printer.brand} ${printer.name}`],
     [t('pdf.rowMaterial'), material.name],
     [t('pdf.rowQuality'), quality],
     [t('pdf.rowQuantity'), `${est.quantity}`],
     [t('pdf.rowDelivery'), t('pdf.deliveryDays', { n: est.leadDays })],
     [t('pdf.rowProduction'), `${t('pdf.machineTime', { dur: formatDuration(est.total.printTimeSec, t) })}${est.plates > 1 ? t('pdf.plates', { n: est.plates }) : ''}`],
-  ]
+  )
   autoTable(doc, {
     startY: imgTop, margin: { left: infoX }, tableWidth: infoW, theme: 'plain',
     styles: { font: 'DejaVu', fontSize: 8.5, cellPadding: 1.3 },
@@ -157,11 +164,24 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
     columnStyles: { 1: { halign: 'center', cellWidth: 22 }, 2: { halign: 'right', cellWidth: 38 }, 3: { halign: 'right', cellWidth: 38 } },
     head: [[t('pdf.thDescription'), t('pdf.thQuantity'), t('pdf.thUnitPrice'), t('pdf.thAmount')]],
     body: [[
-      `${t('pdf.serviceTitle', { name: q.fileName.replace(/\.[^.]+$/, '') })}\n${t('pdf.serviceDesc', { tech: isFdm ? t('pdf.techFdmShort') : t('pdf.techResinShort'), mat: material.name, quality })}${est.perUnit.supportGrams > 0 ? t('pdf.supported') : ''}`,
+      `${parts ? t('pdf.projectService', { n: parts.length }) : t('pdf.serviceTitle', { name: q.fileName.replace(/\.[^.]+$/, '') })}\n${t('pdf.serviceDesc', { tech: isFdm ? t('pdf.techFdmShort') : t('pdf.techResinShort'), mat: material.name, quality })}${est.perUnit.supportGrams > 0 ? t('pdf.supported') : ''}`,
       String(est.quantity), money(pricing.unitPrice), money(pricing.total),
     ]],
   })
   y = finalY() + 2
+  if (parts) {
+    // Parça listesi: birim/toplam fiyatlar teklif fiyatı ile aynı oranda ölçeklenir (kâr/elle giriş)
+    const scale = est.total.price > 0 ? pricing.total / est.total.price : 1
+    autoTable(doc, {
+      startY: y, margin: { left: M, right: M }, theme: 'striped',
+      styles: { font: 'DejaVu', fontSize: 8.5, cellPadding: 1.8 },
+      headStyles: { fillColor: [235, 240, 245], textColor: 40, fontStyle: 'bold' },
+      columnStyles: { 1: { halign: 'center', cellWidth: 40 }, 2: { halign: 'center', cellWidth: 18 }, 3: { halign: 'right', cellWidth: 32 }, 4: { halign: 'right', cellWidth: 32 } },
+      head: [[t('pdf.thPart'), t('pdf.thSize'), t('pdf.thQty'), t('pdf.thUnit'), t('pdf.thTotal')]],
+      body: parts.map((p) => [p.name, `${num(p.size.x, 0)} × ${num(p.size.y, 0)} × ${num(p.size.z, 0)}`, String(p.quantity), money(p.unitPrice * scale), money(p.total * scale)]),
+    })
+    y = finalY() + 2
+  }
   autoTable(doc, {
     startY: y, margin: { left: W - M - 98 }, tableWidth: 98, theme: 'plain',
     styles: { font: 'DejaVu', fontSize: 9.5, cellPadding: 1.8 },

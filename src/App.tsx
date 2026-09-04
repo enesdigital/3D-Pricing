@@ -3,6 +3,8 @@ import { PRINTERS, CURATED_PRINTERS, DEFAULT_PRINTER_ID } from './data/printers.
 import { MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact, fmtMoney } from './lib/cost/engine.ts'
+import { estimateProject, type ProjectEstimate, type ProjectPart } from './lib/cost/project.ts'
+import { gridInstances, packedInstances } from './lib/cost/pack.ts'
 import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams, Translate } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
@@ -11,7 +13,8 @@ import { normalizeCustomMaterials, normalizeCustomPrinters } from './lib/cost/no
 import { thinFraction, thinMask as buildThinMask } from './lib/mesh/thickness.ts'
 import { FileDrop } from './components/FileDrop.tsx'
 import { makeSamplePawnStl } from './lib/mesh/sample.ts'
-import { Viewer3D } from './components/Viewer3D.tsx'
+import { Viewer3D, MAX_INSTANCES, type ViewerInstance, type ViewerPart } from './components/Viewer3D.tsx'
+import { ProjectPanel } from './components/ProjectPanel.tsx'
 import { ModelPanel } from './components/ModelPanel.tsx'
 import { FdmParamsPanel, ResinParamsPanel } from './components/ParamsPanel.tsx'
 import { ResultsPanel } from './components/ResultsPanel.tsx'
@@ -47,7 +50,7 @@ export default function App() {
   const [customMaterials, setCustomMaterials] = useLocalStorage<Material[]>(LS + 'customMaterials', [], normalizeCustomMaterials)
 
   // --- Oturum durumu ---
-  const [placement, setPlacement] = useState<Placement>(DEFAULT_PLACEMENT)
+  const [plateIndex, setPlateIndex] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editor, setEditor] = useState<{ open: boolean; printer: PrinterProfile | null }>({ open: false, printer: null })
   const [matEditor, setMatEditor] = useState<{ open: boolean; material: Material | null }>({ open: false, material: null })
@@ -66,6 +69,14 @@ export default function App() {
   const [logo, setLogo] = useLocalStorage<QuoteImage | null>(LS + 'quoteLogo', null)
   const captureRef = useRef<(() => string | null) | null>(null)
   const mesh = useMeshWorker(t)
+  const active = mesh.active
+  const activeId = mesh.activeId
+  // Yerleşim etkin parçaya aittir (çok parçalı projede her parçanın kendi döndürme/ölçeği vardır)
+  const placement = active?.placement ?? DEFAULT_PLACEMENT
+  const { setPlacement: meshSetPlacement } = mesh
+  const setPlacement = useCallback((p: Placement) => { if (activeId) meshSetPlacement(activeId, p) }, [activeId, meshSetPlacement])
+  /** İki ve daha fazla parça: proje modu (karışık tabla, parça başına adet) */
+  const projectMode = mesh.parts.length >= 2
 
   // --- Tema (açık / koyu) ---
   // next-themes yerine düz DOM + localStorage: aynı kod hem bu uygulamada hem GitHub sürümünde çalışır.
@@ -147,8 +158,8 @@ export default function App() {
   const layerHeight = Math.max(0.01, printer.tech === 'fdm' ? fdmParams.layerHeight : resinParams.layerHeight)
   const overhangThresholdDeg = printer.tech === 'fdm' ? fdmParams.overhangThresholdDeg : resinParams.overhangThresholdDeg
 
-  // Model yüklendiğinde / yerleşim, katman, eşik değiştiğinde yeniden analiz (debounce)
-  const modelLoaded = !!mesh.model && mesh.model.positions.length > 0
+  // Parçalar yüklendiğinde / yerleşim, katman, eşik değiştiğinde yeniden analiz (debounce). Her parça kendi anahtarıyla izlenir.
+  const modelLoaded = !!active && active.loaded && active.model.positions.length > 0
   // 3MF proje dosyasındaki renk/ekstruder sayısını FDM parametresine uygula (dosya başına bir kez)
   const appliedHintFor = useRef<string | null>(null)
   useEffect(() => {
@@ -159,25 +170,50 @@ export default function App() {
     appliedHintFor.current = key
     setFdmParams((p) => ({ ...p, colorCount: Math.min(16, m.colorHint!) }))
   }, [mesh.model, modelLoaded, setFdmParams])
+  const analysisKey = `${layerHeight}|${overhangThresholdDeg}|${manifoldCheck}|${thicknessCheck}`
+  const analyzedKeys = useRef(new Map<string, string>())
+  const { analyze: meshAnalyze } = mesh
   useEffect(() => {
-    if (!modelLoaded) return
-    const t = setTimeout(() => mesh.analyze({ placement, overhangThresholdDeg, layerHeight, manifoldCheck, thickness: thicknessCheck }), 120)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelLoaded, placement, overhangThresholdDeg, layerHeight, manifoldCheck, thicknessCheck])
+    const keyOf = (p: { placement: Placement }) => `${analysisKey}|${p.placement.rotX},${p.placement.rotY},${p.placement.rotZ},${p.placement.unit},${p.placement.scalePct}`
+    const ids = new Set(mesh.parts.map((p) => p.id))
+    for (const k of [...analyzedKeys.current.keys()]) if (!ids.has(k)) analyzedKeys.current.delete(k)
+    const todo = mesh.parts.filter((p) => p.loaded && p.model.positions.length > 0 && analyzedKeys.current.get(p.id) !== keyOf(p))
+    if (todo.length === 0) return
+    const timer = setTimeout(() => {
+      for (const p of todo) {
+        analyzedKeys.current.set(p.id, keyOf(p))
+        meshAnalyze(p.id, { placement: p.placement, overhangThresholdDeg, layerHeight, manifoldCheck, thickness: thicknessCheck })
+      }
+    }, 120)
+    return () => clearTimeout(timer)
+  }, [mesh.parts, analysisKey, overhangThresholdDeg, layerHeight, manifoldCheck, thicknessCheck, meshAnalyze])
 
+  const { loadFile } = mesh
+  /** Etkin parçanın yerine yükle (tek modelli akış) */
   const onFile = useCallback(async (file: File) => {
-    setPlacement((p) => (p.rotX === 0 && p.rotY === 0 && p.rotZ === 0 && p.unit === 1 && p.scalePct === 100 ? p : DEFAULT_PLACEMENT))
     setSlicerData(null); setUseSlicer(false); setCalibAdded(false)
-    await mesh.loadFile(file)
-  }, [mesh])
+    await loadFile(file, { quantity: Math.max(1, Math.floor(settings.quantity)) })
+  }, [loadFile, settings.quantity])
+  /** Projeye yeni parça ekle */
+  const onAddPart = useCallback(async (file: File) => {
+    setSlicerData(null); setUseSlicer(false); setCalibAdded(false)
+    await loadFile(file, { add: true, quantity: 1 })
+  }, [loadFile])
 
   const stats = mesh.analysis.stats
+  // Adet etkin parçaya aittir; ayarlardaki adet yeni yüklenen dosyanın varsayılanıdır
+  const qty = Math.max(1, Math.floor(active?.quantity ?? settings.quantity))
+  const settingsQ = useMemo<BusinessSettings>(() => (settings.quantity === qty ? settings : { ...settings, quantity: qty }), [settings, qty])
+  const { setQuantity: meshSetQuantity } = mesh
+  const setQty = useCallback((v: number) => {
+    const q = Math.min(MAX_QUANTITY, Math.max(1, Math.round(v)))
+    if (activeId) meshSetQuantity(activeId, q)
+    setSettings((st) => ({ ...st, quantity: q }))
+  }, [activeId, meshSetQuantity, setSettings])
   // Duvar kalınlığı: FDM eşiği 2 hat genişliği (en az 0.8 mm), reçine 0.6 mm
   const thinThreshold = printer.tech === 'fdm' ? Math.max(0.8, 2 * fdmParams.lineWidth) : 0.6
   const thickness = mesh.analysis.thickness
   const thinness = useMemo(() => (thickness && !thickness.skipped && thickness.sampleCount > 0 ? { fraction: thinFraction(thickness, thinThreshold), thresholdMm: thinThreshold, p5: thickness.p5 } : null), [thickness, thinThreshold])
-  const thinMaskArr = useMemo(() => (thickness && !thickness.skipped && stats ? buildThinMask(thickness, thinThreshold, stats.triangleCount) : null), [thickness, thinThreshold, stats])
   const calibration = useMemo(() => (material ? calibrationFactors(calibrations, printer.id, material.id) : null), [calibrations, printer.id, material])
   const slicerOverride = useMemo<SlicerOverride | null>(() => {
     if (!useSlicer || !slicerData || slicerData.printTimeSec == null || slicerData.filamentGrams == null) return null
@@ -188,20 +224,29 @@ export default function App() {
   const modelEstimate = useMemo<Estimate | null>(() => {
     if (!stats || !material) return null
     return printer.tech === 'fdm'
-      ? estimateFdm({ stats, printer, material, settings, params: fdmParams, thinness }, t)
-      : estimateResin({ stats, printer, material, settings, params: resinParams, thinness }, t)
-  }, [stats, printer, material, settings, fdmParams, resinParams, t, thinness])
+      ? estimateFdm({ stats, printer, material, settings: settingsQ, params: fdmParams, thinness }, t)
+      : estimateResin({ stats, printer, material, settings: settingsQ, params: resinParams, thinness }, t)
+  }, [stats, printer, material, settingsQ, fdmParams, resinParams, t, thinness])
   const estimate = useMemo<Estimate | null>(() => {
     if (!stats || !material) return null
     if (!slicerOverride && (!calibration || calibration.samples === 0)) return modelEstimate
     return printer.tech === 'fdm'
-      ? estimateFdm({ stats, printer, material, settings, params: fdmParams, slicer: slicerOverride, calibration, thinness }, t)
-      : estimateResin({ stats, printer, material, settings, params: resinParams, calibration, thinness }, t)
-  }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration, modelEstimate, thinness])
+      ? estimateFdm({ stats, printer, material, settings: settingsQ, params: fdmParams, slicer: slicerOverride, calibration, thinness }, t)
+      : estimateResin({ stats, printer, material, settings: settingsQ, params: resinParams, calibration, thinness }, t)
+  }, [stats, printer, material, settingsQ, fdmParams, resinParams, t, slicerOverride, calibration, modelEstimate, thinness])
+  // Çok parçalı proje tahmini: analizi bitmiş tüm parçalar, aynı yazıcı/malzeme, karışık tablalar
+  const projectParts = useMemo<ProjectPart[]>(() => mesh.parts.filter((p) => p.analysis.stats).map((p) => ({ id: p.id, name: p.model.fileName, stats: p.analysis.stats!, quantity: p.quantity })), [mesh.parts])
+  const projectEstimate = useMemo<ProjectEstimate | null>(() => {
+    if (!projectMode || projectParts.length === 0 || !material) return null
+    return estimateProject({ parts: projectParts, printer, material, settings, fdmParams, resinParams, calibration }, t)
+  }, [projectMode, projectParts, printer, material, settings, fdmParams, resinParams, calibration, t])
+  /** Ekranda gösterilen tahmin: proje modunda proje, aksi halde etkin parça */
+  const shownEstimate: Estimate | null = projectMode ? projectEstimate : estimate
+  const projectFileName = useMemo(() => (projectMode ? t('pdf.projectModel', { n: mesh.parts.length, names: mesh.parts.map((p) => p.model.fileName).join(', ') }) : (mesh.model?.fileName ?? '')), [projectMode, mesh.parts, mesh.model, t])
   // Adet fiyat merdiveni: 1 / 10 / 50 / 100 (+ mevcut adet)
   const ladder = useMemo(() => {
-    if (!stats || !material) return []
-    const qtys = [...new Set([1, 10, 50, 100, Math.max(1, Math.floor(settings.quantity))])].sort((a, b) => a - b)
+    if (!stats || !material || projectMode) return []
+    const qtys = [...new Set([1, 10, 50, 100, qty])].sort((a, b) => a - b)
     return qtys.map((q) => {
       const s = { ...settings, quantity: q }
       const e = printer.tech === 'fdm'
@@ -209,7 +254,7 @@ export default function App() {
         : estimateResin({ stats, printer, material, settings: s, params: resinParams, calibration }, t)
       return { qty: q, unit: e.perUnit.price, total: e.total.price }
     })
-  }, [stats, printer, material, settings, fdmParams, resinParams, t, slicerOverride, calibration])
+  }, [stats, printer, material, settings, qty, projectMode, fdmParams, resinParams, t, slicerOverride, calibration])
   const presetKey = printer.tech === 'fdm' ? `${fdmParams.layerHeight}mm/${Math.round(fdmParams.infillDensity * 100)}%/${fdmParams.wallLoops}w` : `${resinParams.layerHeight}mm`
   const addCalibrationFromSlicer = () => {
     if (!modelEstimate || !material || !slicerOverride || !mesh.model) return
@@ -230,24 +275,51 @@ export default function App() {
     return subset.map((p) => {
       const mats = materials.filter((m) => m.tech === p.tech)
       const m = p.tech === printer.tech && material ? material : mats[0]
-      const est = p.tech === 'fdm'
-        ? estimateFdm({ stats, printer: p, material: m, settings, params: fdmParams }, t)
-        : estimateResin({ stats, printer: p, material: m, settings, params: resinParams }, t)
+      const est: Estimate = projectMode && projectParts.length > 0
+        ? estimateProject({ parts: projectParts, printer: p, material: m, settings, fdmParams, resinParams }, t)
+        : p.tech === 'fdm'
+          ? estimateFdm({ stats, printer: p, material: m, settings: settingsQ, params: fdmParams }, t)
+          : estimateResin({ stats, printer: p, material: m, settings: settingsQ, params: resinParams }, t)
       return { printer: p, material: m, est }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats, printers, materials, printer.id, printer.tech, material, settings, fdmParams, resinParams, t])
+  }, [stats, printers, materials, printer.id, printer.tech, material, settingsQ, settings, fdmParams, resinParams, t, projectMode, projectParts])
 
-  const fits = stats ? checkFit(stats, printer).fits : true
+  const fits = projectMode ? (projectEstimate ? projectEstimate.fitsRotated : true) : stats ? checkFit(stats, printer).fits : true
   const layout = useMemo(() => {
     if (!stats) return null
     const spacing = printer.tech === 'fdm' ? settings.fdmPartSpacingMm : resinSpacing(stats, settings.resinPartSpacingMm)
     return plateLayout(stats, printer, spacing, settings.plateMarginMm)
   }, [stats, printer, settings.fdmPartSpacingMm, settings.resinPartSpacingMm, settings.plateMarginMm])
-  const qty = Math.max(1, Math.floor(settings.quantity))
   const bedForViewer = useMemo(() => ({ x: printer.bed.x, y: printer.bed.y, z: printer.bed.z }), [printer])
+  // 3B sahne: proje modunda seçili tabladaki tüm parçalar, tek modelde etkin parça + ızgara kopyaları
+  const thinMasks = useMemo(() => new Map(mesh.parts.map((p) => {
+    const th = p.analysis.thickness, st = p.analysis.stats
+    return [p.id, th && !th.skipped && st ? buildThinMask(th, thinThreshold, st.triangleCount) : null] as const
+  })), [mesh.parts, thinThreshold])
+  const plates = useMemo(() => projectEstimate?.project.plates ?? [], [projectEstimate])
+  const plateIdx = plates.length > 0 ? Math.min(plateIndex, plates.length - 1) : 0
+  useEffect(() => { if (plateIndex !== plateIdx) setPlateIndex(plateIdx) }, [plateIndex, plateIdx])
+  const viewerParts = useMemo<ViewerPart[]>(() => (projectMode ? mesh.parts : active ? [active] : [])
+    .filter((p) => p.loaded && p.model.positions.length > 0)
+    .map((p) => ({
+      key: p.id, positions: p.model.positions, placement: p.analysis.stats ? p.analysis.placement : p.placement,
+      bboxMin: p.analysis.stats?.min ?? null, bboxMax: p.analysis.stats?.max ?? null,
+      overhangMask: p.analysis.overhangMask, thinMask: thinMasks.get(p.id) ?? null, active: p.id === activeId,
+    })), [projectMode, mesh.parts, active, thinMasks, activeId])
+  const viewerInstances = useMemo<ViewerInstance[]>(() => {
+    if (projectMode) {
+      const plate = plates[plateIdx]
+      if (!plate || !projectEstimate) return viewerParts.map((_, i) => ({ part: i, x: bedForViewer.x / 2, y: bedForViewer.y / 2, rotated: false })).slice(0, 0)
+      const idx = new Map(viewerParts.map((p, i) => [p.key, i]))
+      return packedInstances(plate, projectEstimate.project.margin).filter((i) => idx.has(i.key)).map((i) => ({ part: idx.get(i.key)!, x: i.x, y: i.y, rotated: i.rotated }))
+    }
+    if (!stats || !layout || layout.capacity === 0) return [{ part: 0, x: bedForViewer.x / 2, y: bedForViewer.y / 2, rotated: false }]
+    return gridInstances(layout, Math.min(qty, MAX_INSTANCES), bedForViewer).map((g) => ({ part: 0, ...g }))
+  }, [projectMode, plates, plateIdx, projectEstimate, viewerParts, stats, layout, qty, bedForViewer])
   const busyLabel = mesh.busy === 'reading' ? t('busy.reading') : mesh.busy === 'parsing' ? t('busy.parsing') : mesh.busy === 'analyzing' ? t('busy.analyzing') : ''
 
+  const cmpQty = shownEstimate?.quantity ?? qty
   const resetAll = () => { resetSettings(); resetMaterialPrices(); resetPrinterOverrides() }
 
   return (
@@ -287,22 +359,32 @@ export default function App() {
             <FileDrop onFile={onFile} onSample={() => onFile(makeSamplePawnStl())} />
           ) : (
             <>
-              <Card title="Model">
+              <Card title={t('project.title', { n: mesh.parts.length })}>
+                <ProjectPanel
+                  parts={mesh.parts} activeId={activeId} onActive={mesh.setActive} onQuantity={(id, q) => { mesh.setQuantity(id, q); if (id === activeId) setSettings((st) => ({ ...st, quantity: q })) }}
+                  onRemove={mesh.remove} onAdd={onAddPart} est={projectEstimate} settings={settings} plateIndex={plateIdx} onPlateIndex={setPlateIndex}
+                />
+              </Card>
+              <Card title={projectMode ? `${t('cards.model')} · ${mesh.model.fileName}` : t('cards.model')}>
                 <ModelPanel
                   model={mesh.model} stats={stats} placement={placement} onPlacement={setPlacement}
-                  manifoldCheck={manifoldCheck} onManifoldCheck={setManifoldCheck} onClear={mesh.clear}
+                  manifoldCheck={manifoldCheck} onManifoldCheck={setManifoldCheck} onClear={() => (projectMode && activeId ? mesh.remove(activeId) : mesh.clear())}
                   thicknessCheck={thicknessCheck} onThicknessCheck={setThicknessCheck} thickness={thickness} thinness={thinness}
                 />
               </Card>
               <FileDrop onFile={onFile} compact />
-              <Card title={t('slicer.title')}>
-                <SlicerImport
-                  material={material ?? null} data={slicerData} partsInFile={partsInFile} useIt={useSlicer} modelEstimate={modelEstimate}
-                  onData={(d) => { setSlicerData(d); setCalibAdded(false); setUseSlicer(!!d && d.printTimeSec != null && d.filamentGrams != null) }}
-                  onPartsInFile={(n) => { setPartsInFile(n); setCalibAdded(false) }} onUse={setUseSlicer}
-                  onAddCalibration={addCalibrationFromSlicer} calibAdded={calibAdded}
-                />
-              </Card>
+              {projectMode ? (
+                <p className="text-[11px] text-zinc-500">{t('project.slicerHidden')}</p>
+              ) : (
+                <Card title={t('slicer.title')}>
+                  <SlicerImport
+                    material={material ?? null} data={slicerData} partsInFile={partsInFile} useIt={useSlicer} modelEstimate={modelEstimate}
+                    onData={(d) => { setSlicerData(d); setCalibAdded(false); setUseSlicer(!!d && d.printTimeSec != null && d.filamentGrams != null) }}
+                    onPartsInFile={(n) => { setPartsInFile(n); setCalibAdded(false) }} onUse={setUseSlicer}
+                    onAddCalibration={addCalibrationFromSlicer} calibAdded={calibAdded}
+                  />
+                </Card>
+              )}
             </>
           )}
           {mesh.error && <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-200">{mesh.error}</div>}
@@ -328,7 +410,7 @@ export default function App() {
                 <Button onClick={() => setMatEditor({ open: true, material: null })}>{t('actions.addMaterial')}</Button>
                 {material && isCustomMaterial(material.id) && <Button variant="ghost" onClick={() => setMatEditor({ open: true, material })}>{t('actions.editDelete')}</Button>}
               </div>
-              <Field label={t('fields.quantity')}><NumberInput value={settings.quantity} onChange={(v) => setSettings({ ...settings, quantity: Math.min(MAX_QUANTITY, Math.max(1, Math.round(v))) })} min={1} max={MAX_QUANTITY} step={1} /></Field>
+              {!projectMode && <Field label={t('fields.quantity')}><NumberInput value={qty} onChange={setQty} min={1} max={MAX_QUANTITY} step={1} /></Field>}
             </div>
           </Card>
 
@@ -342,30 +424,21 @@ export default function App() {
         {/* Orta: 3B görünüm */}
         <div className="flex min-h-[520px] flex-col gap-4 xl:min-h-[calc(100vh-7rem)]">
           <div className="relative flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
-            <Viewer3D
-              positions={modelLoaded ? mesh.model!.positions : null}
-              overhangMask={mesh.analysis.overhangMask}
-              thinMask={thinMaskArr}
-              placement={stats ? mesh.analysis.placement : placement}
-              bboxMin={stats?.min ?? null}
-              bboxMax={stats?.max ?? null}
-              bed={bedForViewer}
-              fits={fits}
-              copies={qty}
-              layout={layout}
-              captureRef={captureRef}
-            />
+            <Viewer3D parts={viewerParts} instances={viewerInstances} bed={bedForViewer} fits={fits} captureRef={captureRef} />
             <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-400">
               {printer.brand} {printer.name} · {t('viewer.bed')} {printer.bed.x}×{printer.bed.y}×{printer.bed.z} mm
               {stats && !fits && <span className="ml-2 text-red-300">{t('viewer.notFit')}</span>}
-              {stats && layout && layout.capacity > 0 && qty > 1 && (
+              {projectMode && plates.length > 0 && (
+                <span className="ml-2 text-emerald-300">{t('viewer.plateOf', { i: plateIdx + 1, n: plates.length })} · {t('viewer.projectShowing', { parts: Object.keys(plates[plateIdx].counts).length, inst: plates[plateIdx].partCount })}</span>
+              )}
+              {!projectMode && stats && layout && layout.capacity > 0 && qty > 1 && (
                 <span className={`ml-2 ${qty > layout.capacity ? 'text-amber-300' : 'text-emerald-300'}`}>
                   {t('viewer.showing', { shown: Math.min(qty, layout.capacity), qty, cols: layout.cols, rows: layout.rows, rot: layout.rotated ? t('viewer.rotated90') : '' })}
                   {qty > layout.capacity && t('viewer.platesNeeded', { n: Math.ceil(qty / layout.capacity) })}
                 </span>
               )}
             </div>
-            {stats && layout && qty > layout.capacity && layout.capacity > 0 && (
+            {!projectMode && stats && layout && qty > layout.capacity && layout.capacity > 0 && (
               <div className="pointer-events-none absolute bottom-3 left-3 right-3 rounded-md border border-amber-900/60 bg-amber-950/70 px-3 py-2 text-xs text-amber-200">
                 {t('viewer.overCapacity', { qty, cap: layout.capacity, cols: layout.cols, rows: layout.rows, plates: Math.ceil(qty / layout.capacity) })}
               </div>
@@ -384,10 +457,10 @@ export default function App() {
                   <thead className="text-left text-[11px] uppercase text-zinc-500">
                     <tr>
                       <th className="py-1 pr-2">{t('compare.printer')}</th><th className="py-1 pr-2">{t('compare.material')}</th>
-                      <th className="py-1 pr-2 text-right">{t('compare.gramPer')}</th><th className="py-1 pr-2 text-right">{settings.quantity > 1 ? t('compare.totalTime') : t('compare.time')}</th>
-                      {settings.quantity > 1 && <th className="py-1 pr-2 text-right">{t('compare.plate')}</th>}
+                      <th className="py-1 pr-2 text-right">{t('compare.gramPer')}</th><th className="py-1 pr-2 text-right">{cmpQty > 1 ? t('compare.totalTime') : t('compare.time')}</th>
+                      {cmpQty > 1 && <th className="py-1 pr-2 text-right">{t('compare.plate')}</th>}
                       <th className="py-1 pr-2 text-right">{t('compare.pricePer')}</th>
-                      {settings.quantity > 1 && <th className="py-1 text-right">{t('compare.total', { qty: settings.quantity })}</th>}
+                      {cmpQty > 1 && <th className="py-1 text-right">{t('compare.total', { qty: cmpQty })}</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -400,9 +473,9 @@ export default function App() {
                         <td className="py-1.5 pr-2 text-xs text-zinc-400">{m.name}</td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">{est.perUnit.materialGrams.toFixed(0)} g</td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">{fmtDur(est.total.printTimeSec, t)}</td>
-                        {settings.quantity > 1 && <td className="py-1.5 pr-2 text-right tabular-nums text-xs text-zinc-400">{est.plates} × {est.partsPerPlate}</td>}
+                        {cmpQty > 1 && <td className="py-1.5 pr-2 text-right tabular-nums text-xs text-zinc-400">{est.plates} × {est.partsPerPlate}</td>}
                         <td className="py-1.5 pr-2 text-right tabular-nums">{fmtMoney(est.perUnit.price, settings, 0)}</td>
-                        {settings.quantity > 1 && <td className="py-1.5 text-right font-semibold tabular-nums">{fmtMoney(est.total.price, settings, 0)}</td>}
+                        {cmpQty > 1 && <td className="py-1.5 text-right font-semibold tabular-nums">{fmtMoney(est.total.price, settings, 0)}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -414,7 +487,7 @@ export default function App() {
 
         {/* Sağ: sonuç */}
         <div className="space-y-4">
-          <Card title={t('cards.priceEstimate')} right={estimate && (
+          <Card title={t('cards.priceEstimate')} right={shownEstimate && (
             <div className="flex gap-1">
               <Button variant="ghost" onClick={() => window.print()} ariaLabel={t('actions.printAria')} title={t('actions.printTitle')}>{t('actions.print')}</Button>
               <Button variant="primary" ariaLabel={t('actions.quotePdfAria')} title={t('actions.quotePdfTitle')} onClick={async () => {
@@ -425,8 +498,8 @@ export default function App() {
               }}>{t('actions.quotePdf')}</Button>
             </div>
           )}>
-            {estimate && material ? (
-              <ResultsPanel est={estimate} printer={printer} material={material} settings={settings} calibSamples={calibration?.samples} ladder={ladder} />
+            {shownEstimate && material ? (
+              <ResultsPanel est={shownEstimate} printer={printer} material={material} settings={settings} calibSamples={calibration?.samples} ladder={ladder} />
             ) : (
               <div className="text-sm text-zinc-500">
                 {mesh.error ? (
@@ -454,19 +527,23 @@ export default function App() {
         {t('footer.text')}
       </footer>
 
-      {estimate && material && quoteOpen && (
+      {shownEstimate && material && quoteOpen && (
         <QuoteDialog
-          open={quoteOpen} est={estimate} settings={settings}
+          open={quoteOpen} est={shownEstimate} settings={settings}
           customer={customer} onCustomer={setCustomer}
           logo={logo} onLogo={setLogo} modelImage={modelImage}
-          share={{ printer, material, fileName: mesh.model?.fileName ?? '', size: stats ? stats.size : { x: 0, y: 0, z: 0 } }}
+          share={{ printer, material, fileName: projectFileName, size: stats ? stats.size : { x: 0, y: 0, z: 0 } }}
           busy={pdfBusy} error={pdfError}
           onClose={() => setQuoteOpen(false)}
           onGenerate={async (pricing: QuotePricing, includeProduction: boolean) => {
-            if (!stats || !mesh.model) return
+            const pdfStats = stats ?? projectParts[0]?.stats
+            if (!pdfStats || !mesh.model) return
             setPdfBusy(true); setPdfError(null)
             try {
-              await downloadQuotePdf({ est: estimate, stats, printer, material, settings, fdmParams, resinParams, placement, fileName: mesh.model.fileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction }, t)
+              const parts = projectMode && projectEstimate
+                ? projectEstimate.project.parts.filter((p) => p.placed > 0).map((p) => ({ name: p.name, quantity: p.placed, size: projectParts.find((x) => x.id === p.id)!.stats.size, unitPrice: p.unitPrice, total: p.price }))
+                : undefined
+              await downloadQuotePdf({ est: shownEstimate, stats: pdfStats, printer, material, settings, fdmParams, resinParams, placement, fileName: projectFileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction, parts }, t)
               setQuoteOpen(false)
             } catch (e) {
               setPdfError(e instanceof Error ? e.message : String(e))

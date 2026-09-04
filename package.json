@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --no-warnings tests/fixes.test.ts && node --experimental-strip-types --no-warnings tests/slicer.test.ts && node --experimental-strip-types --no-warnings tests/thickness.test.ts && node --experimental-strip-types --no-warnings tests/share.test.ts && node --experimental-strip-types --no-warnings tests/import.test.ts"
+    "test": "node --experimental-strip-types --no-warnings tests/fixes.test.ts && node --experimental-strip-types --no-warnings tests/slicer.test.ts && node --experimental-strip-types --no-warnings tests/thickness.test.ts && node --experimental-strip-types --no-warnings tests/share.test.ts && node --experimental-strip-types --no-warnings tests/import.test.ts && node --experimental-strip-types --no-warnings tests/project.test.ts"
   },
   "dependencies": {
     "jspdf": "^4.2.1",
