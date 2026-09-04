@@ -34,6 +34,12 @@ export function NumberInput({ value, onChange, min, max, step, suffix, className
         value={Number.isFinite(value) ? value : ''}
         min={min} max={max} step={step ?? 'any'}
         onChange={(e) => { const v = parseFloat(e.target.value); if (!Number.isNaN(v)) onChange(v) }}
+        onBlur={() => {
+          // Yazarken serbest; odak çıkınca min/max'a sıkıştır (aksi halde negatif KDV/kâr gibi değerler kalıyordu)
+          if (!Number.isFinite(value)) { if (min != null) onChange(min); return }
+          const c = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, value))
+          if (c !== value) onChange(c)
+        }}
         className="w-full min-w-0 bg-transparent px-2 py-1.5 text-sm text-zinc-100 outline-none"
       />
       {suffix && <span className="shrink-0 pr-2 text-xs text-zinc-500">{suffix}</span>}

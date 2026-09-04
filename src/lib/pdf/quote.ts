@@ -40,8 +40,6 @@ export interface QuoteInput {
 export interface QuoteFonts { regular: string; bold: string } // base64 TTF
 
 import { fmtMoney } from '../cost/engine.ts'
-let money = (n: number) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' ₺'
-const num = (n: number, d = 1) => n.toLocaleString('tr-TR', { maximumFractionDigits: d })
 
 export function quoteFileName(q: QuoteInput, quoteNo: string, t: Translate): string {
   const safe = q.fileName.replace(/\.[^.]+$/, '').replace(/[^\w\-çğıöşüÇĞİÖŞÜ ]+/g, '_').slice(0, 40)
@@ -58,7 +56,15 @@ export async function downloadQuotePdf(q: QuoteInput, t: Translate): Promise<str
 }
 
 /** Teklif numarası: T-YYYYMMDD-HHMMSS (verilmişse dışarıdan gelen numara kullanılır) */
+let lastQuoteNo = ''
 export function makeQuoteNo(now = new Date()): string {
+  const base = quoteNoBase(now)
+  // Aynı saniyede ikinci numara: sonek ile ayrıştır
+  const no = base === lastQuoteNo.replace(/-\d+$/, '') && lastQuoteNo ? `${base}-${(parseInt(lastQuoteNo.slice(base.length + 1) || '1', 10) + 1)}` : base
+  lastQuoteNo = no
+  return no
+}
+function quoteNoBase(now: Date): string {
   return `T-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
 }
 
@@ -80,13 +86,15 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
   doc.setFont('DejaVu', 'normal')
 
   const { est, stats, printer, material, settings, pricing } = q
-  money = (n: number) => fmtMoney(n, settings)
+  const money = (n: number) => fmtMoney(n, settings)
+  const locale = t('locale') === 'locale' ? 'tr-TR' : t('locale')
+  const num = (n: number, d = 1) => n.toLocaleString(locale, { maximumFractionDigits: d })
   const W = doc.internal.pageSize.getWidth()
   const M = 15
   const now = new Date()
   const quoteNo = q.quoteNo ?? makeQuoteNo(now)
   const validUntil = new Date(now.getTime() + settings.quoteValidityDays * 86400000)
-  const dateStr = (d: Date) => d.toLocaleDateString('tr-TR')
+  const dateStr = (d: Date) => d.toLocaleDateString(locale)
   const finalY = () => (doc as unknown as WithTable).lastAutoTable.finalY
   let y = M
   const pageH = doc.internal.pageSize.getHeight()
@@ -105,13 +113,15 @@ export async function buildQuotePdf(q: QuoteInput, fonts: QuoteFonts, t: Transla
   doc.setFont('DejaVu', 'bold'); doc.setFontSize(15)
   doc.text(settings.companyName || t('pdf.defaultTitle'), textX, y + 6)
   doc.setFont('DejaVu', 'normal'); doc.setFontSize(9); doc.setTextColor(90)
-  if (settings.companyContact) doc.text(doc.splitTextToSize(settings.companyContact, W - textX - M - 60) as string[], textX, y + 11)
+  let contactLines = 0
+  if (settings.companyContact) { const cl = doc.splitTextToSize(settings.companyContact, W - textX - M - 60) as string[]; contactLines = cl.length; doc.text(cl, textX, y + 11) }
   doc.setTextColor(0)
   doc.setFont('DejaVu', 'bold'); doc.setFontSize(20); doc.text(t('pdf.heading'), W - M, y + 6, { align: 'right' })
   doc.setFont('DejaVu', 'normal'); doc.setFontSize(9)
   doc.text(t('pdf.no', { no: quoteNo }), W - M, y + 11, { align: 'right' })
   doc.text(t('pdf.dateValidity', { date: dateStr(now), valid: dateStr(validUntil) }), W - M, y + 15.5, { align: 'right' })
-  y += 22
+  // Uzun iletişim bilgisi (3+ satır) başlık çizgisiyle çakışmasın
+  y += Math.max(22, 11 + 4 * contactLines + 3)
   doc.setDrawColor(200); doc.line(M, y, W - M, y); y += 6
 
   if (q.customer.trim()) {

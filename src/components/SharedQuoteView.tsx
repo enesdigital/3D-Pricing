@@ -16,7 +16,7 @@ export function SharedQuoteView({ quote: q, onClose }: { quote: SharedQuote; onC
   ]
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-      <div className="my-8 w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl">
+      <div className="my-8 w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" role="dialog" aria-modal="true" aria-label={t('share.sharedTitle')}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <div><h2 className="text-base font-semibold">{t('share.sharedTitle')}</h2><p className="text-[11px] text-zinc-500">{t('share.sharedHint')}</p></div>
           <Button variant="primary" onClick={onClose}>{t('share.close')}</Button>

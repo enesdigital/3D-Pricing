@@ -41,9 +41,14 @@ function parseModelXml(xml: string, objects: Map<string, Obj>, prefix: string): 
     const id = attrs.match(/\bid="([^"]+)"/)?.[1]
     if (!id) continue
     const vx: number[] = []
-    const vRe = /<vertex\b[^>]*\bx="([^"]+)"[^>]*\by="([^"]+)"[^>]*\bz="([^"]+)"/g
+    // Öznitelik sırası x,y,z olmak zorunda değil (bazı yazıcı yazılımları farklı sırada yazar)
+    const vRe = /<vertex\b([^>]*)\/?>/g
     let vm: RegExpExecArray | null
-    while ((vm = vRe.exec(body)) !== null) vx.push(+vm[1], +vm[2], +vm[3])
+    while ((vm = vRe.exec(body)) !== null) {
+      const a = vm[1]
+      const x = a.match(/\bx="([^"]+)"/), y = a.match(/\by="([^"]+)"/), z = a.match(/\bz="([^"]+)"/)
+      if (x && y && z) vx.push(+x[1], +y[1], +z[1])
+    }
     const tr: number[] = []
     const pids = new Set<string>()
     const tRe = /<triangle\b([^>]*)\/?>/g

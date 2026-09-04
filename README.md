@@ -17,7 +17,7 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 - Adet girildiğinde tabla bazlı parti hesabı: parçalar tablaya ızgara yerleşimiyle sığdırılır, reçinede süre parça sayısından bağımsız (katman sayısı), FDM'de ısınma/kalibrasyon ve renk değişimleri tabla başına amortize edilir
 - **Çok parçalı proje:** birden fazla dosya (+ Parça ekle) aynı teklifte; her parçanın kendi adedi, döndürmesi ve ölçeği vardır. Tüm kopyalar aynı yazıcı/malzeme ile karışık tablalara MaxRects (best-short-side-fit, 90° döndürme) ile yerleştirilir; FDM'de tabla süresi katman katman toplanır (soğutma tabanı ortak, ısınma bir kez), reçinede en yüksek parçanın katman sayısı belirler. Fiyat parçalara tek başına maliyet ağırlığıyla dağıtılır; 3B görünümde tabla tabla yerleşim gösterilir, PDF'e parça tablosu eklenir. Sığmayan parça hesap dışı bırakılıp uyarılır (en fazla 24 parça)
 - **Teklif geçmişi ve müşteri kartı:** teklif penceresindeki “Kaydet” ya da PDF indirme, teklifi (no, tarih, müşteri, model/parçalar, yazıcı, malzeme, adet, fiyat, maliyet, üretim özeti, küçük görsel, paylaşım özeti) tarayıcının IndexedDB'sine yazar. Üst çubuktaki “Teklifler” penceresinde arama, durum (taslak/gönderildi/kabul/red), müşteri filtresi, not, paylaşım bağlantısı/WhatsApp, CSV listesi; müşteri kartlarında telefon/e-posta/firma (telefon varsa WhatsApp paylaşımı doğrudan o numaraya gider, teklifte ad yazınca otomatik kart açılır, otomatik tamamlama). Geçmiş JSON yedeğe dahildir
-- Açılır listede atölyedeki yazıcılar (Bambu Lab A1 Combo, X2D Combo, Elegoo Jupiter 2, Anycubic Photon P1; `ACTIVE_PRINTER_IDS` ile düzenlenir) ve eklediğiniz yazıcılar; hepsi aynı model için yan yana karşılaştırılır (adet başına ve toplam sipariş fiyatı)
+- Açılır listede atölyedeki yazıcılar (Bambu Lab A1 Combo, X2D Combo, Elegoo Jupiter 2, Anycubic Photon P1; `ACTIVE_PRINTER_IDS` ile düzenlenir) ve eklediğiniz yazıcılar; reçine menüsü Genel/Elegoo/Anycubic markalarıyla sınırlı (`ACTIVE_RESIN_BRANDS`), diğerleri “Malzeme ekle” şablonu olarak durur; hepsi aynı model için yan yana karşılaştırılır (adet başına ve toplam sipariş fiyatı)
 - Dahili katalog (yalnızca “Yazıcı ekle” şablonu olarak): 4 Türk perakendecisinden (3dultra, robo90, rhino3dprinter, metatechtr) derlenen ~150 FDM/reçine yazıcı ve ~390 filament/reçine (marka + tür bazında, kg fiyatı medyan; fiyatı olmayan ya da siteler arasında tabla/fiyat/kasa bilgisi çelişen kayıtlar atılır). `scripts/build-catalog.py` JSON kaynaklarını (`scripts/catalog/`) tekilleştirip `src/data/catalog.ts` üretir; teknik parametreler sınıf sezgileriyle türetilir (elle doğrulanmış 9 profil `printers.ts` içinde önceliklidir)
 - Kendi yazıcınızı ve malzemenizi ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcı/malzemeler yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
 - Müşteriye gönderilebilir **teklif PDF'i**: firma bilgisi ve logo (PNG/JPEG/SVG, tarayıcıda saklanır), 3B görünümden model görseli, kalemsiz fiyat tablosu (kâr marjı ya da elle girilen birim/toplam fiyat), KDV, isteğe bağlı üretim bilgisi; Türkçe karakterler için gömülü DejaVu Sans
@@ -31,7 +31,7 @@ npm install
 npm run dev
 ```
 
-Üretim derlemesi: `npm run build` → `dist/`. Motor/dilimleyici regresyon testleri: `npm test` (Node 22+, tip sıyırma ile çalışır).
+Üretim derlemesi: `npm run build` → `dist/`. Motor/dilimleyici regresyon testleri: `npm test` (Node 22+, tip sıyırma ile çalışır; CI'da tip denetimi, lint ve testler build'den önce koşar).
 
 ## Yayınlama
 

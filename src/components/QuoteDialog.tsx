@@ -95,7 +95,7 @@ export function QuoteDialog(p: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={() => { if (!p.busy) p.onClose() }}>
-      <div className="my-6 w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="my-6 w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" role="dialog" aria-modal="true" aria-label={t('quoteDialog.title')} onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <div>
             <h2 className="text-base font-semibold">{t('quoteDialog.title')}</h2>
@@ -181,7 +181,7 @@ export function QuoteDialog(p: Props) {
                 <>
                   <Button onClick={() => window.open(whatsappUrl(matchedCustomer?.phone || settings.whatsappNumber || '', text), '_blank', 'noopener')}>💬 {t('share.whatsapp')}{matchedCustomer?.phone ? ` → ${matchedCustomer.phone}` : ''}</Button>
                   <Button onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('URL', link) } }}>🔗 {copied ? t('share.linkCopied') : t('share.copyLink')}</Button>
-                  <Button onClick={() => downloadText(`teklif_${sq.model.replace(/\.[^.]+$/, '')}.csv`, quoteCsv(est, pricing, { model: sq.model, printer: sq.printer, material: sq.material, currency: sq.currency }), 'text/csv')}>📊 {t('share.csv')}</Button>
+                  <Button onClick={() => downloadText(`teklif_${sq.model.replace(/\.[^.]+$/, '')}.csv`, quoteCsv(est, pricing, { model: sq.model, printer: sq.printer, material: sq.material, currency: sq.currency }, t), 'text/csv')}>📊 {t('share.csv')}</Button>
                 </>
               )
             })()}

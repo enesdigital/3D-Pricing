@@ -61,7 +61,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     if (typeof window === 'undefined') return 'tr'
     try {
-      const saved = localStorage.getItem(LS_LANG)
+      const saved = localStorage.getItem(LS_LANG)?.replace(/"/g, '')
       if (saved === 'tr' || saved === 'en') return saved
     } catch { /* ignore */ }
     return detectLang()

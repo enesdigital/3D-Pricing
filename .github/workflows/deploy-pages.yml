@@ -24,6 +24,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit -p tsconfig.tests.json
+      - run: npx oxlint src tests
+      - run: npm test
       # Depo adı alt dizin olarak servis edilir: https://<kullanici>.github.io/<repo>/
       - run: npm run build
         env:

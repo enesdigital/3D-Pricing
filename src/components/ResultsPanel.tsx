@@ -32,7 +32,7 @@ export function ResultsPanel({ est, printer, material, settings, calibSamples, l
           </div>
         )}
         <div className="text-xs uppercase tracking-wide text-sky-300/80">{tr('results.salePrice')}</div>
-        <div className="mt-1 text-3xl font-bold tabular-nums text-white">{fmtTRY(vatIncl ? u.priceWithVat : u.price)}<span className="ml-1 text-sm font-normal text-zinc-400">{tr('results.perUnit')}{vatIncl ? ' · KDV dahil' : ''}</span></div>
+        <div className="mt-1 text-3xl font-bold tabular-nums text-white">{fmtTRY(vatIncl ? u.priceWithVat : u.price)}<span className="ml-1 text-sm font-normal text-zinc-400">{tr('results.perUnit')}{vatIncl ? tr('results.vatInclSuffix') : ''}</span></div>
         <div className="mt-1 text-sm text-zinc-300">
           {tr('results.vatInclPerUnit', { x: fmtTRY(u.priceWithVat) })}
           {qty > 1 && <> · <b>{tr('results.totalForQty', { qty, t: fmtTRY(t.price) })}</b> {tr('results.vatIncl', { tv: fmtTRY(t.priceWithVat) })}</>}

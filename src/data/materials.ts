@@ -29,8 +29,13 @@ export const CURATED_MATERIALS: Material[] = [
 const normKey = (m: Material) => m.name.toLowerCase().replace(/[^a-z0-9+]+/g, ' ').trim()
 const curatedKeys = new Set(CURATED_MATERIALS.map(normKey))
 
-/** Tüm dahili malzemeler: seçilmiş liste + perakende kataloğu (aynı marka+tür tekrar eklenmez). */
-export const MATERIALS: Material[] = [
+/** Tüm dahili malzemeler: seçilmiş liste + perakende kataloğu (aynı marka+tür tekrar eklenmez). Menüde gösterilmez; "Malzeme ekle" şablonu. */
+export const ALL_MATERIALS: Material[] = [
   ...CURATED_MATERIALS,
   ...CATALOG_MATERIALS.filter((m) => !curatedKeys.has(normKey(m))),
 ]
+
+/** Menüde gösterilen reçine markaları (atölyede kullanılanlar); filamentler şimdilik tam liste */
+export const ACTIVE_RESIN_BRANDS = ['Genel', 'Elegoo', 'Anycubic']
+const brandOf = (m: Material) => m.brand ?? m.name.split(' ')[0]
+export const MATERIALS: Material[] = ALL_MATERIALS.filter((m) => m.tech !== 'resin' || ACTIVE_RESIN_BRANDS.includes(brandOf(m)))

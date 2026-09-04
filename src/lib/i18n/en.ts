@@ -25,7 +25,7 @@ export const en: Dict = {
     comparisonHint: `Listed printers and your own printers`,
     how: `How is it calculated?`,
   },
-  units: { min: `min`, days: `days` },
+  units: { min: `min`, days: `days`, hour: `h` },
   slicer: {
     title: `Slicer data`,
     drop: `Drop a G-code or .gcode.3mf file (Bambu Studio, OrcaSlicer, PrusaSlicer, Cura)`,
@@ -121,6 +121,7 @@ export const en: Dict = {
     notFit: `— model does not fit`,
     showing: `— showing {shown} / {qty} pcs ({cols}×{rows}{rot})`,
     rotated90: `, rotated 90°`,
+    aria: `3D preview: {printer} plate, {n} copies`,
     plateOf: ` · Plate {i}/{n}`,
     projectShowing: `{parts} parts, {inst} copies`,
     platesNeeded: ` · {n} plates needed`,
@@ -261,6 +262,9 @@ export const en: Dict = {
     needRefresh: `A new version is available.`,
     reload: `Reload`,
   },
+  csv: { model: `Model`, printer: `Printer`, material: `Material`, qty: `Qty`, calcCurrency: `Currency (calc)`, item: `Item`, detail: `Detail`, amount: `Amount (TRY)`, totalCost: `Total cost`, unitExVat: `Unit price (excl. VAT)`, totalExVat: `Total (excl. VAT)`, vat: `VAT`, grandTotal: `Grand total`, materialTotal: `Material total (g)`, timeTotal: `Time total (h)`, energy: `Energy (kWh)`, plates: `Plates`, lead: `Lead (business days)`, date: `Date`, quoteNo: `Quote No`, customer: `Customer`, vatPct: `VAT %`, currency: `Currency`, costTry: `Cost (TRY)`, leadDays: `Lead (days)`, status: `Status`, note: `Note` },
+  storage: { quota: `Browser storage is full: the last change could not be saved. Use a smaller logo or export and clear the quote history.` },
+  locale: `en-US`,
   fileDrop: {
     addCompact: `Drop or click to add a part to the project`,
     compact: `Click or drag to upload another file`,
@@ -311,6 +315,7 @@ export const en: Dict = {
   results: {
     salePrice: `Estimated sale price (excl. VAT)`,
     perUnit: `/ pc`,
+    vatInclSuffix: ` · incl. VAT`,
     vatInclPerUnit: `incl. VAT {x} / pc`,
     totalForQty: `{qty} pcs total {t}`,
     vatIncl: `(incl. VAT {tv})`,

@@ -70,6 +70,9 @@ export function useMeshWorker(t: Translate) {
   const latest = useRef(new Map<string, { load: number; analyze: number }>())
   const pending = useRef(new Map<number, { partId: string; kind: 'load' | 'analyze'; placement?: Placement }>())
   const [state, setState] = useState<MeshWorkerState>({ parts: [], activeId: null, busy: 'idle', progress: 0, error: null })
+  // Olay işleyicilerinde güncel state'i senkron okumak için (setState güncelleyicisi ertelenebilir)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const idleIfDone = (s: MeshWorkerState): MeshWorkerState => (pending.current.size === 0 ? { ...s, busy: 'idle', progress: 1 } : s)
   const markPending = (parts: MeshPart[]) => parts.map((p) => {
@@ -124,8 +127,9 @@ export function useMeshWorker(t: Translate) {
         case 'error': {
           // Eski bir isteğin hatası bile olsa göster; kullanıcı ne olduğunu bilmeli.
           // Yükleme sırasında hata: yarım kalan (0 üçgenli) hayalet parçayı kaldır.
+          // id -1: worker genel hatası (self.onerror) → hangi istek olduğu bilinmez, bekleyenlerin hepsi düşer
           const req = pending.current.get(msg.id)
-          pending.current.delete(msg.id)
+          if (msg.id === -1) pending.current.clear(); else pending.current.delete(msg.id)
           setState((s) => {
             let parts = s.parts
             if (req?.kind === 'load') parts = parts.filter((p) => !(p.id === req.partId && !p.loaded))
@@ -166,14 +170,19 @@ export function useMeshWorker(t: Translate) {
       setState((s) => ({ ...s, error: tRef.current('mesh.unsupported') }))
       return null
     }
+    const cur = stateRef.current
+    const add = !!opts.add && cur.parts.length > 0
+    if (add && cur.parts.length >= MAX_PARTS) {
+      setState((s) => ({ ...s, error: tRef.current('project.maxParts', { n: MAX_PARTS }) }))
+      return null
+    }
+    // Yerine geçilecek parça senkron belirlenir (güncelleyici içinde atamak güvenilmez: React erteleyebilir)
+    const replacedId: string | null = add ? null : cur.activeId
     const partId = newPartId()
     const id = ++reqSeq.current
     latest.current.set(partId, { load: id, analyze: 0 })
     pending.current.set(id, { partId, kind: 'load' })
-    let replacedId: string | null = null
     setState((s) => {
-      const add = !!opts.add && s.parts.length > 0
-      if (add && s.parts.length >= MAX_PARTS) return s
       const part: MeshPart = {
         id: partId,
         model: { fileName: file.name, fileSize: file.size, format: '', triangleCount: 0, positions: new Float32Array(0) },
@@ -183,14 +192,17 @@ export function useMeshWorker(t: Translate) {
       let parts: MeshPart[]
       if (add) parts = [...s.parts, part]
       else {
-        replacedId = s.activeId
-        const idx = s.parts.findIndex((p) => p.id === s.activeId)
+        const idx = s.parts.findIndex((p) => p.id === replacedId)
         parts = idx >= 0 ? s.parts.map((p, i) => (i === idx ? part : p)) : [...s.parts, part]
       }
       return { ...s, parts, activeId: partId, busy: 'reading', progress: 0, error: null }
     })
     // Yerine geçilen parçanın bekleyen isteklerini geçersiz kıl ve worker'dan bırak
-    if (replacedId) { latest.current.delete(replacedId); try { send({ type: 'unload', partId: replacedId }) } catch { /* yoksay */ } }
+    if (replacedId) {
+      latest.current.delete(replacedId)
+      for (const [k, v] of pending.current) if (v.partId === replacedId) pending.current.delete(k)
+      try { send({ type: 'unload', partId: replacedId }) } catch { /* yoksay */ }
+    }
     try {
       const buffer = await file.arrayBuffer()
       if (latest.current.get(partId)?.load !== id) { pending.current.delete(id); return null } // bu arada parça kaldırıldı/değişti

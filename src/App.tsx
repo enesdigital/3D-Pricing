@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRINTERS, ALL_PRINTERS, DEFAULT_PRINTER_ID } from './data/printers.ts'
-import { MATERIALS } from './data/materials.ts'
+import { MATERIALS, ALL_MATERIALS } from './data/materials.ts'
 import { DEFAULT_FDM_PARAMS, DEFAULT_RESIN_PARAMS, DEFAULT_SETTINGS } from './data/defaults.ts'
 import { estimateFdm, estimateResin, checkFit, plateLayout, resinSpacing, MAX_QUANTITY, formatDurationCompact, fmtMoney } from './lib/cost/engine.ts'
 import { estimateProject, type ProjectEstimate, type ProjectPart } from './lib/cost/project.ts'
@@ -8,7 +8,7 @@ import { gridInstances, packedInstances } from './lib/cost/pack.ts'
 import type { BusinessSettings, Estimate, FdmPrintParams, Material, PrinterProfile, ResinPrintParams, Translate } from './lib/cost/types.ts'
 import { DEFAULT_PLACEMENT, type Placement } from './lib/mesh/types.ts'
 import { useMeshWorker } from './lib/mesh/useMeshWorker.ts'
-import { shallowMerge, useLocalStorage } from './lib/useLocalStorage.ts'
+import { shallowMerge, useLocalStorage, STORAGE_QUOTA_EVENT } from './lib/useLocalStorage.ts'
 import { normalizeCustomMaterials, normalizeCustomPrinters } from './lib/cost/normalize.ts'
 import { thinFraction, thinMask as buildThinMask } from './lib/mesh/thickness.ts'
 import { FileDrop } from './components/FileDrop.tsx'
@@ -70,6 +70,15 @@ export default function App() {
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  // localStorage kotası dolduğunda kullanıcıya bildirim (useLocalStorage olay gönderir)
+  const [quotaError, setQuotaError] = useState(false)
+  useEffect(() => {
+    const on = () => setQuotaError(true)
+    window.addEventListener(STORAGE_QUOTA_EVENT, on)
+    return () => window.removeEventListener(STORAGE_QUOTA_EVENT, on)
+  }, [])
+  // Aynı teklif hem Kaydet hem PDF ile iki kez yazılmasın: pencere açıkken kaydedilen numara hatırlanır
+  const savedQuoteNo = useRef<string | null>(null)
   const [modelImage, setModelImage] = useState<QuoteImage | null>(null)
   const [logo, setLogo] = useLocalStorage<QuoteImage | null>(LS + 'quoteLogo', null)
   const captureRef = useRef<(() => string | null) | null>(null)
@@ -87,7 +96,7 @@ export default function App() {
   // next-themes yerine düz DOM + localStorage: aynı kod hem bu uygulamada hem GitHub sürümünde çalışır.
   const [theme, setThemeState] = useState<'light' | 'dark'>('dark')
   useEffect(() => {
-    const stored = (localStorage.getItem(LS + 'theme') as 'light' | 'dark' | null) ?? 'dark'
+    const stored = (localStorage.getItem(LS + 'theme') ?? 'dark').replace(/"/g, '') === 'light' ? 'light' : 'dark'
     setThemeState(stored)
     const el = document.documentElement
     el.classList.remove('light', 'dark')
@@ -134,6 +143,8 @@ export default function App() {
     ...customMaterials,
   ], [materialPrices, customMaterials])
   const isCustomMaterial = (id: string) => customMaterials.some((m) => m.id === id)
+  /** "Malzeme ekle" şablonları: menüdekiler + eklenenler + tüm katalog */
+  const materialTemplates = useMemo<Material[]>(() => { const seen = new Set(materials.map((m) => m.id)); return [...materials, ...ALL_MATERIALS.filter((m) => !seen.has(m.id))] }, [materials])
   const saveMaterial = (m: Material) => {
     setCustomMaterials((list) => (list.some((x) => x.id === m.id) ? list.map((x) => (x.id === m.id ? m : x)) : [...list, m]))
     if (m.tech === printer.tech) setMaterialId(m.id)
@@ -144,6 +155,13 @@ export default function App() {
     setMatEditor({ open: false, material: null })
   }
   const printer = printers.find((p) => p.id === printerId) ?? printers[0]
+  // Kayıtlı yazıcı artık aktif listede değilse (katalog daraltıldı) sessizce A1'e düşmek yerine "eklediğim yazıcılar"a taşı;
+  // böylece override/kalibrasyon kayıtları aynı kimlikle çalışmaya devam eder.
+  useEffect(() => {
+    if (printers.some((p) => p.id === printerId)) return
+    const legacy = ALL_PRINTERS.find((p) => p.id === printerId)
+    if (legacy) setCustomPrinters((list) => (list.some((x) => x.id === legacy.id) ? list : [...list, legacy]))
+  }, [printerId, printers, setCustomPrinters])
   const techMaterials = materials.filter((m) => m.tech === printer.tech)
   const materialGroups = useMemo(() => {
     const label = (m: Material) => `${m.name} · ${m.pricePerKgTRY.toLocaleString('tr-TR')} ₺/kg`
@@ -283,15 +301,17 @@ export default function App() {
     return printers.map((p) => {
       const mats = materials.filter((m) => m.tech === p.tech)
       const m = p.tech === printer.tech && material ? material : mats[0]
+      // Seçili yazıcının satırı ana panelle aynı girdileri (kalibrasyon, dilimleyici, ince duvar) alır
+      const sel = p.id === printer.id
       const est: Estimate = projectMode && projectParts.length > 0
-        ? estimateProject({ parts: projectParts, printer: p, material: m, settings, fdmParams, resinParams }, t)
+        ? estimateProject({ parts: projectParts, printer: p, material: m, settings, fdmParams, resinParams, calibration: sel ? calibration : null }, t)
         : p.tech === 'fdm'
-          ? estimateFdm({ stats, printer: p, material: m, settings: settingsQ, params: fdmParams }, t)
-          : estimateResin({ stats, printer: p, material: m, settings: settingsQ, params: resinParams }, t)
+          ? estimateFdm({ stats, printer: p, material: m, settings: settingsQ, params: fdmParams, slicer: sel ? slicerOverride : null, calibration: sel ? calibration : null, thinness: sel ? thinness : null }, t)
+          : estimateResin({ stats, printer: p, material: m, settings: settingsQ, params: resinParams, calibration: sel ? calibration : null, thinness: sel ? thinness : null }, t)
       return { printer: p, material: m, est }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats, printers, materials, printer.id, printer.tech, material, settingsQ, settings, fdmParams, resinParams, t, projectMode, projectParts])
+  }, [stats, printers, materials, printer.id, printer.tech, material, settingsQ, settings, fdmParams, resinParams, t, projectMode, projectParts, calibration, slicerOverride, thinness])
 
   const fits = projectMode ? (projectEstimate ? projectEstimate.fitsRotated : true) : stats ? checkFit(stats, printer).fits : true
   const layout = useMemo(() => {
@@ -447,7 +467,7 @@ export default function App() {
         {/* Orta: 3B görünüm */}
         <div className="flex min-h-[520px] flex-col gap-4 xl:min-h-[calc(100vh-7rem)]">
           <div className="relative flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
-            <Viewer3D parts={viewerParts} instances={viewerInstances} bed={bedForViewer} fits={fits} captureRef={captureRef} />
+            <Viewer3D parts={viewerParts} instances={viewerInstances} bed={bedForViewer} fits={fits} captureRef={captureRef} ariaLabel={t('viewer.aria', { printer: `${printer.brand} ${printer.name}`, n: viewerInstances.length })} />
             <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-400">
               {printer.brand} {printer.name} · {t('viewer.bed')} {printer.bed.x}×{printer.bed.y}×{printer.bed.z} mm
               {stats && !fits && <span className="ml-2 text-red-300">{t('viewer.notFit')}</span>}
@@ -517,6 +537,7 @@ export default function App() {
                 setPdfError(null)
                 const url = captureRef.current?.()
                 if (url) { try { const { w, h } = await imageSize(url); setModelImage({ dataUrl: url, w, h }) } catch { setModelImage(null) } } else setModelImage(null)
+                savedQuoteNo.current = null
                 setQuoteOpen(true)
               }}>{t('actions.quotePdf')}</Button>
             </div>
@@ -553,8 +574,10 @@ export default function App() {
       {shownEstimate && material && quoteOpen && (
         <QuoteDialog
           onSave={async (pricing: QuotePricing) => {
-            const quoteNo = makeQuoteNo()
-            return (await persistQuote(pricing, quoteNo)) ? quoteNo : null
+            const quoteNo = savedQuoteNo.current ?? makeQuoteNo()
+            const ok = await persistQuote(pricing, quoteNo)
+            if (ok) savedQuoteNo.current = quoteNo
+            return ok ? quoteNo : null
           }}
           open={quoteOpen} est={shownEstimate} settings={settings}
           customer={customer} onCustomer={setCustomer}
@@ -570,9 +593,9 @@ export default function App() {
               const parts = projectMode && projectEstimate
                 ? projectEstimate.project.parts.filter((p) => p.placed > 0).map((p) => ({ name: p.name, quantity: p.placed, size: projectParts.find((x) => x.id === p.id)!.stats.size, unitPrice: p.unitPrice, total: p.price }))
                 : undefined
-              const quoteNo = makeQuoteNo()
+              const quoteNo = savedQuoteNo.current ?? makeQuoteNo()
               await downloadQuotePdf({ est: shownEstimate, stats: pdfStats, printer, material, settings, fdmParams, resinParams, placement, fileName: projectFileName, triangleCount: mesh.model.triangleCount, customer, pricing, logo, modelImage, includeProduction, parts, quoteNo }, t)
-              void persistQuote(pricing, quoteNo)
+              void persistQuote(pricing, quoteNo).then((ok) => { if (ok) savedQuoteNo.current = quoteNo })
               setQuoteOpen(false)
             } catch (e) {
               setPdfError(e instanceof Error ? e.message : String(e))
@@ -581,6 +604,12 @@ export default function App() {
         />
       )}
       <PwaToast />
+      {quotaError && (
+        <div role="alert" className="fixed bottom-4 left-4 z-50 flex max-w-md items-start gap-3 rounded-xl border border-amber-800 bg-amber-950/95 px-4 py-3 text-sm text-amber-100 shadow-2xl backdrop-blur">
+          <span>⚠ {t('storage.quota')}</span>
+          <Button variant="ghost" onClick={() => setQuotaError(false)} ariaLabel={t('share.close')}>✕</Button>
+        </div>
+      )}
       <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} whatsappNumber={settings.whatsappNumber ?? ''} />
       {shared && <SharedQuoteView quote={shared} onClose={() => { setShared(null); history.replaceState(null, '', location.pathname + location.search) }} />}
       <PrinterEditor
@@ -590,7 +619,7 @@ export default function App() {
       />
       <MaterialEditor
         key={`material-${matEditor.open ? (matEditor.material?.id ?? 'new') : 'closed'}`}
-        open={matEditor.open} initial={matEditor.material} templates={materials} defaultTech={printer.tech}
+        open={matEditor.open} initial={matEditor.material} templates={materialTemplates} defaultTech={printer.tech}
         onSave={saveMaterial} onDelete={deleteMaterial} onClose={() => setMatEditor({ open: false, material: null })}
       />
       <SettingsDialog

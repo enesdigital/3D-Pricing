@@ -23,7 +23,7 @@ export const tr = {
     comparisonHint: `Listedeki yazıcılar ve eklediğiniz yazıcılar`,
     how: `Nasıl hesaplanıyor?`,
   },
-  units: { min: `dk`, days: `gün` },
+  units: { min: `dk`, days: `gün`, hour: `sa` },
   slicer: {
     title: `Dilimleyici verisi`,
     drop: `G-code veya .gcode.3mf bırakın (Bambu Studio, OrcaSlicer, PrusaSlicer, Cura)`,
@@ -119,6 +119,7 @@ export const tr = {
     notFit: `— model sığmıyor`,
     showing: `— {shown} / {qty} adet gösteriliyor ({cols}×{rows}{rot})`,
     rotated90: `, 90° döndürülmüş`,
+    aria: `3B önizleme: {printer} tablası, {n} kopya`,
     plateOf: ` · Tabla {i}/{n}`,
     projectShowing: `{parts} parça, {inst} kopya`,
     platesNeeded: ` · {n} tabla gerekir`,
@@ -259,6 +260,9 @@ export const tr = {
     needRefresh: `Yeni sürüm hazır.`,
     reload: `Yenile`,
   },
+  csv: { model: `Model`, printer: `Yazıcı`, material: `Malzeme`, qty: `Adet`, calcCurrency: `Para birimi (hesap)`, item: `Kalem`, detail: `Açıklama`, amount: `Tutar (TRY)`, totalCost: `Toplam maliyet`, unitExVat: `Birim fiyat (KDV hariç)`, totalExVat: `Toplam (KDV hariç)`, vat: `KDV`, grandTotal: `Genel toplam`, materialTotal: `Malzeme toplam (g)`, timeTotal: `Süre toplam (sa)`, energy: `Enerji (kWh)`, plates: `Tabla`, lead: `Teslim (iş günü)`, date: `Tarih`, quoteNo: `Teklif No`, customer: `Müşteri`, vatPct: `KDV %`, currency: `Para birimi`, costTry: `Maliyet (TRY)`, leadDays: `Teslim (gün)`, status: `Durum`, note: `Not` },
+  storage: { quota: `Tarayıcı depolama alanı dolu: son değişiklik kaydedilemedi. Daha küçük bir logo kullanın ya da teklif geçmişini dışa aktarıp temizleyin.` },
+  locale: `tr-TR`,
   fileDrop: {
     addCompact: `Projeye parça eklemek için dosya bırakın veya tıklayın`,
     compact: `Başka bir dosya yüklemek için tıklayın veya sürükleyin`,
@@ -309,6 +313,7 @@ export const tr = {
   results: {
     salePrice: `Tahmini satış fiyatı (KDV hariç)`,
     perUnit: `/ adet`,
+    vatInclSuffix: ` · KDV dahil`,
     vatInclPerUnit: `KDV dahil {x} / adet`,
     totalForQty: `{qty} adet toplam {t}`,
     vatIncl: `(KDV dahil {tv})`,

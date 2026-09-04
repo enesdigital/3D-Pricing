@@ -56,7 +56,7 @@ export function SettingsDialog(p: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={p.onClose}>
-      <div className="my-6 w-full max-w-3xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="my-6 w-full max-w-3xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" role="dialog" aria-modal="true" aria-label={t('settings.title')} onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <h2 className="text-base font-semibold">{t('settings.title')}</h2>
           <div className="flex gap-2">
@@ -78,7 +78,7 @@ export function SettingsDialog(p: Props) {
             <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t('settings.secBusiness')}</h3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               <Field label={t('settings.electricity')} hint={t('settings.electricityHint')}><NumberInput value={s.electricityTRYPerKWh} onChange={(v) => set('electricityTRYPerKWh', v)} min={0} step={0.1} suffix="₺/kWh" /></Field>
-              <Field label={t('settings.labor')}><NumberInput value={s.laborTRYPerHour} onChange={(v) => set('laborTRYPerHour', v)} min={0} step={10} suffix="₺/sa" /></Field>
+              <Field label={t('settings.labor')}><NumberInput value={s.laborTRYPerHour} onChange={(v) => set('laborTRYPerHour', v)} min={0} step={10} suffix={`₺/${t('units.hour')}`} /></Field>
               <Field label={t('settings.markup')}><NumberInput value={Math.round(s.markup * 100)} onChange={(v) => set('markup', v / 100)} min={0} max={500} step={5} suffix="%" /></Field>
               <Field label={t('settings.vat')}><NumberInput value={Math.round(s.vat * 100)} onChange={(v) => set('vat', v / 100)} min={0} max={50} step={1} suffix="%" /></Field>
               <Field label={t('settings.failureFdm')} hint={t('settings.failureFdmHint')}><NumberInput value={Math.round(s.failureRate * 100)} onChange={(v) => set('failureRate', Math.min(0.9, v / 100))} min={0} max={50} step={1} suffix="%" /></Field>
@@ -143,7 +143,7 @@ export function SettingsDialog(p: Props) {
               </div>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Field label={t('pricing.printerCount')}><NumberInput value={s.printerCount ?? 1} onChange={(v) => set('printerCount', Math.max(1, Math.round(v)))} min={1} step={1} /></Field>
-                <Field label={t('pricing.workHours')} hint={t('pricing.deliveryHint')}><NumberInput value={s.workHoursPerDay ?? 20} onChange={(v) => set('workHoursPerDay', Math.min(24, Math.max(1, v)))} min={1} max={24} step={1} suffix="sa" /></Field>
+                <Field label={t('pricing.workHours')} hint={t('pricing.deliveryHint')}><NumberInput value={s.workHoursPerDay ?? 20} onChange={(v) => set('workHoursPerDay', Math.min(24, Math.max(1, v)))} min={1} max={24} step={1} suffix={t('units.hour')} /></Field>
               </div>
             </div>
           </section>

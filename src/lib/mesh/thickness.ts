@@ -49,7 +49,6 @@ export function computeThickness(pos: Float32Array, sampleCount = 20000, maxTria
   const samples = new Float32Array(n)
   const tri = new Uint32Array(n)
   const ray = new THREE.Ray()
-  const target = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 } as THREE.Intersection
   // Deterministik sözde rastgele (aynı model → aynı sonuç)
   let seed = 12345
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 }
@@ -77,7 +76,6 @@ export function computeThickness(pos: Float32Array, sampleCount = 20000, maxTria
     tri[i] = t
     if (onProgress && i % 2000 === 0) onProgress(0.4 + 0.6 * (i / n))
   }
-  void target
   const finite = Array.from(samples).filter((x) => Number.isFinite(x)).sort((a, b) => a - b)
   const pct = (p: number) => (finite.length ? finite[Math.min(finite.length - 1, Math.floor(p * finite.length))] : 0)
   return { samples, tri, p5: pct(0.05), p50: pct(0.5), sampleCount: n, skipped: false }

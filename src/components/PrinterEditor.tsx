@@ -92,7 +92,7 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="my-6 w-full max-w-3xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="my-6 w-full max-w-3xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" role="dialog" aria-modal="true" aria-label={t('printerEditor.addTitle')} onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <div>
             <h2 className="text-base font-semibold">{initial ? t('printerEditor.editTitle') : t('printerEditor.addTitle')}</h2>
@@ -121,8 +121,8 @@ export function PrinterEditor({ open, initial, templates, onSave, onDelete, onCl
             <Field label={t('printerEditor.bedY')}><NumberInput value={p.bed.y} onChange={(v) => setBed('y', v)} min={1} step={1} suffix="mm" /></Field>
             <Field label={t('printerEditor.bedZ')}><NumberInput value={p.bed.z} onChange={(v) => setBed('z', v)} min={1} step={1} suffix="mm" /></Field>
             <Field label={t('printerEditor.price')}><NumberInput value={p.priceTRY} onChange={(v) => setP({ ...p, priceTRY: v })} min={0} step={500} suffix="₺" /></Field>
-            <Field label={t('printerEditor.lifetime')} hint={t('printerEditor.lifetimeHint')}><NumberInput value={p.lifetimeHours} onChange={(v) => setP({ ...p, lifetimeHours: v })} min={100} step={100} suffix="sa" /></Field>
-            <Field label={t('printerEditor.maintenance')}><NumberInput value={p.maintenanceTRYPerHour} onChange={(v) => setP({ ...p, maintenanceTRYPerHour: v })} min={0} step={0.5} suffix="₺/sa" /></Field>
+            <Field label={t('printerEditor.lifetime')} hint={t('printerEditor.lifetimeHint')}><NumberInput value={p.lifetimeHours} onChange={(v) => setP({ ...p, lifetimeHours: v })} min={100} step={100} suffix={t('units.hour')} /></Field>
+            <Field label={t('printerEditor.maintenance')}><NumberInput value={p.maintenanceTRYPerHour} onChange={(v) => setP({ ...p, maintenanceTRYPerHour: v })} min={0} step={0.5} suffix={`₺/${t('units.hour')}`} /></Field>
           </div>
 
           <section>

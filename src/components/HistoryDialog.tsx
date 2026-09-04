@@ -70,7 +70,7 @@ export function HistoryDialog({ open, onClose, whatsappNumber }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="my-6 w-full max-w-5xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="my-6 w-full max-w-5xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" role="dialog" aria-modal="true" aria-label={t('history.title')} onClick={(e) => e.stopPropagation()}>
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-5 py-3">
           <div>
             <h2 className="text-base font-semibold">{t('history.title')}</h2>
@@ -99,7 +99,7 @@ export function HistoryDialog({ open, onClose, whatsappNumber }: Props) {
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <span className="ml-auto text-zinc-400">{t('history.summary', { n: filtered.length, total: totals || '—' })}</span>
-              <Button onClick={() => downloadText(`teklifler_${new Date().toISOString().slice(0, 10)}.csv`, quotesCsv(filtered, statusLabel), 'text/csv')} disabled={filtered.length === 0}>📊 {t('share.csv')}</Button>
+              <Button onClick={() => downloadText(`teklifler_${new Date().toISOString().slice(0, 10)}.csv`, quotesCsv(filtered, statusLabel, t), 'text/csv')} disabled={filtered.length === 0}>📊 {t('share.csv')}</Button>
             </div>
             {filtered.length === 0 ? (
               <p className="py-8 text-center text-sm text-zinc-500">{quotes.length === 0 ? t('history.empty') : t('history.noMatch')}</p>
@@ -153,8 +153,8 @@ export function HistoryDialog({ open, onClose, whatsappNumber }: Props) {
                         <td className="py-1.5 pr-2 text-zinc-300">{c.email || '—'}</td>
                         <td className="py-1.5 pr-2 text-right tabular-nums"><button className="hover:text-sky-300" onClick={() => { setCustomerFilter(c.id); setTab('quotes') }}>{quoteCount.get(c.id) ?? 0}</button></td>
                         <td className="whitespace-nowrap py-1.5 text-right">
-                          <button className="px-1.5 text-zinc-400 hover:text-sky-300" onClick={() => setEditing(c)} title={t('history.edit')}>✎</button>
-                          <button className="px-1.5 text-zinc-400 hover:text-red-300" onClick={() => removeCustomer(c)} title={t('history.delete')}>🗑</button>
+                          <button className="px-1.5 text-zinc-400 hover:text-sky-300" onClick={() => setEditing(c)} title={t('history.edit')} aria-label={`${t('history.edit')}: ${c.name}`}>✎</button>
+                          <button className="px-1.5 text-zinc-400 hover:text-red-300" onClick={() => removeCustomer(c)} title={t('history.delete')} aria-label={`${t('history.delete')}: ${c.name}`}>🗑</button>
                         </td>
                       </tr>
                     ))}
@@ -178,8 +178,8 @@ function RowGroup({ r, expanded, onToggle, onStatus, onNote, onDelete, onCopy, o
   const h = Math.round(r.timeSec / 3600 * 10) / 10
   return (
     <>
-      <tr className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-800/40" onClick={onToggle}>
-        <td className="whitespace-nowrap py-1.5 pr-2 tabular-nums text-zinc-300">{new Date(r.date).toLocaleDateString('tr-TR')}</td>
+      <tr className="cursor-pointer border-t border-zinc-800 hover:bg-zinc-800/40 focus:outline-none focus:ring-1 focus:ring-sky-500" onClick={onToggle} tabIndex={0} role="button" aria-expanded={expanded} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onToggle() } }}>
+        <td className="whitespace-nowrap py-1.5 pr-2 tabular-nums text-zinc-300">{new Date(r.date).toLocaleDateString(t('locale'))}</td>
         <td className="whitespace-nowrap py-1.5 pr-2 font-mono text-xs text-zinc-400">{r.quoteNo}</td>
         <td className="max-w-[160px] truncate py-1.5 pr-2">{r.customerName || <span className="text-zinc-600">—</span>}</td>
         <td className="max-w-[220px] truncate py-1.5 pr-2 text-zinc-300" title={r.model}>{r.thumb && <img src={r.thumb} alt="" className="mr-1 inline-block h-6 w-6 rounded bg-white object-contain align-middle" />}{r.model}</td>
@@ -191,9 +191,9 @@ function RowGroup({ r, expanded, onToggle, onStatus, onNote, onDelete, onCopy, o
           </select>
         </td>
         <td className="whitespace-nowrap py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-          <button className="px-1.5 text-zinc-400 hover:text-sky-300" onClick={onWhatsapp} title={t('share.whatsapp')}>💬</button>
-          <button className="px-1.5 text-zinc-400 hover:text-sky-300" onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1500) }} title={t('share.copyLink')}>{copied ? '✓' : '🔗'}</button>
-          <button className="px-1.5 text-zinc-400 hover:text-red-300" onClick={onDelete} title={t('history.delete')}>🗑</button>
+          <button className="px-1.5 text-zinc-400 hover:text-sky-300" onClick={onWhatsapp} title={t('share.whatsapp')} aria-label={t('share.whatsapp')}>💬</button>
+          <button className="px-1.5 text-zinc-400 hover:text-sky-300" onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1500) }} title={t('share.copyLink')} aria-label={t('share.copyLink')}>{copied ? '✓' : '🔗'}</button>
+          <button className="px-1.5 text-zinc-400 hover:text-red-300" onClick={onDelete} title={t('history.delete')} aria-label={t('history.delete')}>🗑</button>
         </td>
       </tr>
       {expanded && (

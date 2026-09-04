@@ -26,6 +26,8 @@ interface Props {
   fits: boolean
   /** Açık zeminli PNG yakalama fonksiyonu buraya yazılır */
   captureRef?: MutableRefObject<(() => string | null) | null>
+  /** Erişilebilir ad (ekran okuyucu) */
+  ariaLabel?: string
 }
 
 const COLOR_NORMAL = new THREE.Color('#60a5fa')
@@ -39,7 +41,7 @@ const PART_TINTS = ['#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#f472b6', '#22d
 
 interface PartEntry { positions: Float32Array; mesh: THREE.InstancedMesh }
 
-export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
+export function Viewer3D({ parts, instances, bed, fits, captureRef, ariaLabel }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -51,7 +53,10 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
     modelGroup: THREE.Group
     entries: Map<string, PartEntry>
     plate: THREE.Mesh | null
+    vol: THREE.LineSegments | null
   } | null>(null)
+  // Kamera yalnızca sahne bileşimi (parçalar/kopya sayısı/tabla) değişince yeniden odaklanır; analiz sonuçları kullanıcının açısını bozmaz
+  const focusKey = useRef('')
 
   // Sahne kurulumu
   useEffect(() => {
@@ -84,7 +89,7 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
     const modelGroup = new THREE.Group()
     root.add(bedGroup, modelGroup)
 
-    sceneRef.current = { renderer, scene, camera, controls, root, bedGroup, modelGroup, entries: new Map(), plate: null }
+    sceneRef.current = { renderer, scene, camera, controls, root, bedGroup, modelGroup, entries: new Map(), plate: null, vol: null }
 
     let raf = 0
     const loop = () => {
@@ -107,9 +112,13 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       const s = sceneRef.current
-      if (s) for (const e of s.entries.values()) { e.mesh.geometry.dispose(); (e.mesh.material as THREE.Material).dispose() }
+      if (s) {
+        for (const e of s.entries.values()) { e.mesh.geometry.dispose(); (e.mesh.material as THREE.Material).dispose() }
+        disposeGroup(s.bedGroup)
+      }
       controls.dispose()
       renderer.dispose()
+      renderer.forceContextLoss()
       el.removeChild(renderer.domElement)
       sceneRef.current = null
     }
@@ -119,12 +128,7 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
   useEffect(() => {
     const s = sceneRef.current
     if (!s) return
-    for (const child of [...s.bedGroup.children]) {
-      const o = child as THREE.Mesh
-      o.geometry?.dispose?.()
-      const m = o.material as THREE.Material | THREE.Material[] | undefined
-      if (Array.isArray(m)) m.forEach((mm) => mm.dispose()); else m?.dispose?.()
-    }
+    disposeGroup(s.bedGroup)
     s.bedGroup.clear()
     const { x, y, z } = bed
     const grid = new THREE.GridHelper(Math.max(x, y), Math.round(Math.max(x, y) / 10), 0x475569, 0x1f2937)
@@ -137,12 +141,14 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
     plate.position.set(x / 2, y / 2, -0.05)
     const vol = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(x, y, z)),
-      new THREE.LineBasicMaterial({ color: fits ? 0x334155 : 0xef4444, transparent: true, opacity: 0.8 }),
+      new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.8 }),
     )
     vol.position.set(x / 2, y / 2, z / 2)
     const axes = new THREE.AxesHelper(Math.min(x, y) * 0.25)
     s.bedGroup.add(plate, grid, vol, axes)
     s.plate = plate
+    s.vol = vol
+    focusKey.current = ''
 
     // Kamerayı tablaya göre konumla
     const d = Math.max(x, y, z) * 1.8
@@ -150,7 +156,15 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
     s.camera.position.set(x / 2 + d * 0.7, d * 0.6, -y / 2 + d * 0.7)
     s.camera.far = d * 20
     s.camera.updateProjectionMatrix()
-  }, [bed.x, bed.y, bed.z, fits, bed])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bed.x, bed.y, bed.z])
+
+  // Sığmama: yalnızca hacim çizgisinin rengi değişir (tabla yeniden kurulmaz, kamera korunur)
+  useEffect(() => {
+    const s = sceneRef.current
+    if (!s?.vol) return
+    ;(s.vol.material as THREE.LineBasicMaterial).color.set(fits ? 0x334155 : 0xef4444)
+  }, [fits])
 
   // Geometri: her parça için bir InstancedMesh; yalnızca konumları değişen/eklenen/kaldırılan parçalar yeniden kurulur
   useEffect(() => {
@@ -247,7 +261,10 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
       e.mesh.instanceMatrix.needsUpdate = true
     })
 
-    // Kamerayı sahneye odakla (tek parça: modele; çoklu: tablaya)
+    // Kamerayı sahneye odakla (tek parça: modele; çoklu: tablaya) — yalnızca bileşim değişince
+    const key = `${parts.map((p) => p.key).join(',')}|${instances.length}|${bed.x}x${bed.y}|${maxH > 0 ? 1 : 0}`
+    if (focusKey.current === key) return
+    focusKey.current = key
     const focus = single ? Math.max(focusW, maxH) : Math.max(bed.x, bed.y, maxH)
     const d = Math.max(focus * (single ? 3.2 : 2.4), 120)
     s.controls.target.set(bed.x / 2, maxH / 2, -bed.y / 2)
@@ -274,5 +291,14 @@ export function Viewer3D({ parts, instances, bed, fits, captureRef }: Props) {
     return () => { captureRef.current = null }
   }, [captureRef])
 
-  return <div ref={mountRef} className="h-full w-full" />
+  return <div ref={mountRef} className="h-full w-full" role="img" aria-label={ariaLabel} />
+}
+
+function disposeGroup(g: THREE.Group) {
+  for (const child of [...g.children]) {
+    const o = child as THREE.Mesh
+    o.geometry?.dispose?.()
+    const m = o.material as THREE.Material | THREE.Material[] | undefined
+    if (Array.isArray(m)) m.forEach((mm) => mm.dispose()); else m?.dispose?.()
+  }
 }

@@ -3,7 +3,7 @@ import type { CalibrationFactors } from '../slicer/types.ts'
 import type { BusinessSettings, CostLine, Estimate, EstimateTotals, FdmPrinterSpec, FdmPrintParams, Material, PrinterProfile, ResinPrinterSpec, ResinPrintParams, Translate } from './types.ts'
 import {
   MAX_QUANTITY, checkFit, estimateFdm, estimateResin, fdmPartModel, fdmPlateEnergyKWh, fdmPlateTime, fdmPlateWaste, fdmColorEvents,
-  geometryWarnings, gramsFromMm3, machineRate, priceLines, resinPlateEnergyKWh, resinPlateTime, resinSpacing, plateLayout,
+  geometryWarnings, gramsFromMm3, machineRate, priceLines, resinPlateEnergyKWh, resinPlateTime, resinSpacing, resinSupportVolume, plateLayout,
 } from './engine.ts'
 import { packPlates, type PackedPlate } from './pack.ts'
 
@@ -147,12 +147,7 @@ export function estimateProject(input: ProjectInput, t: Translate): ProjectEstim
       const st = p.stats
       let modelVolume = st.volume
       if (rp.hollow) { const shell = Math.min(st.volume, st.surfaceArea * rp.hollowWallMm); modelVolume = shell + (st.volume - shell) * rp.hollowResidualRatio }
-      let supportVolume = 0
-      const needsSupport = rp.supports === 'on' || (rp.supports === 'auto' && (st.overhangArea > 4 || st.bedContactArea < st.footprintArea * 0.5))
-      if (needsSupport) {
-        const pillars = st.supportColumnVolume * 0.04, raft = st.size.x * st.size.y * 0.35
-        supportVolume = Math.min(Math.max(pillars + raft, st.volume * rp.supportRatio), st.volume * 0.6 + raft)
-      }
+      const supportVolume = resinSupportVolume(st, rp)
       const grams = gramsFromMm3(modelVolume, material.density) * (calib?.gramsFactor ?? 1)
       const support = gramsFromMm3(supportVolume, material.density) * (calib?.gramsFactor ?? 1)
       const layers = Math.max(1, Math.ceil(st.size.z / layerH - 1e-6))
@@ -207,7 +202,8 @@ export function estimateProject(input: ProjectInput, t: Translate): ProjectEstim
   // Parça uyarıları (geometri/DFM), parça adıyla; sığma/çoklu tabla uyarıları proje düzeyinde ele alındığı için atlanır
   const seen = new Set<string>()
   for (const p of parts) {
-    const gw = geometryWarnings({ t, tech, stats: p.stats, printer, settings, qty: p.quantity, partsPerPlate: p.quantity, plates: 1, marginViolated: false })
+    // Sığma/tabla uyarıları proje düzeyinde (projeNoFit/projectPlates) verildiği için parça başına atlanır
+    const gw = geometryWarnings({ t, tech, stats: p.stats, printer, settings, qty: p.quantity, partsPerPlate: p.quantity, plates: 1, marginViolated: false, skipFit: true })
     for (const w of gw) { const line = `${p.name}: ${w}`; if (!seen.has(line)) { seen.add(line); warnings.push(line) } }
   }
   if (plans.length > 1) warnings.push(t('cost.warn.projectPlates', { qty, p: plans.length }))

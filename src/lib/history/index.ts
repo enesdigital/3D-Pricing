@@ -85,7 +85,11 @@ export async function listQuotes(): Promise<QuoteRecord[]> {
   const all = await dbGetAll<QuoteRecord>(STORE_QUOTES)
   return all.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 }
-export const saveQuote = (q: QuoteRecord) => dbPut(STORE_QUOTES, q)
+/** Aynı teklif numarası varsa üzerine yazar (Kaydet + PDF aynı kaydı günceller) */
+export async function saveQuote(q: QuoteRecord): Promise<void> {
+  const existing = (await dbGetAll<QuoteRecord>(STORE_QUOTES)).find((x) => x.quoteNo === q.quoteNo)
+  await dbPut(STORE_QUOTES, existing ? { ...q, id: existing.id, status: existing.status, note: existing.note || q.note } : q)
+}
 export async function updateQuote(id: string, patch: Partial<QuoteRecord>): Promise<QuoteRecord | null> {
   const cur = await dbGet<QuoteRecord>(STORE_QUOTES, id)
   if (!cur) return null
@@ -129,17 +133,44 @@ export async function exportHistory(): Promise<HistoryBackup> {
 export async function importHistory(h: Partial<HistoryBackup>, replace = false): Promise<number> {
   if (!hasIndexedDb()) return 0
   if (replace) { await dbClear(STORE_QUOTES); await dbClear(STORE_CUSTOMERS) }
-  const quotes = Array.isArray(h.quotes) ? h.quotes.filter((q) => q && typeof q.id === 'string' && typeof q.total === 'number') : []
-  const customers = Array.isArray(h.customers) ? h.customers.filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string') : []
+  const quotes = Array.isArray(h.quotes) ? h.quotes.map(normalizeQuote).filter((q): q is QuoteRecord => q !== null) : []
+  const customers = Array.isArray(h.customers) ? h.customers.map(normalizeCustomer).filter((c): c is CustomerRecord => c !== null) : []
   await dbPutMany(STORE_QUOTES, quotes)
   await dbPutMany(STORE_CUSTOMERS, customers)
   return quotes.length + customers.length
 }
 
+/** Yedekten gelen kaydı QuoteRecord varsayılanlarıyla tamamlar; kimlik/toplam/paylaşım özeti yoksa null */
+export function normalizeQuote(raw: unknown): QuoteRecord | null {
+  if (!raw || typeof raw !== 'object') return null
+  const q = raw as Partial<QuoteRecord>
+  if (typeof q.id !== 'string' || typeof q.total !== 'number' || !q.shared || typeof q.shared !== 'object') return null
+  const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
+  const str = (v: unknown, d = '') => (typeof v === 'string' ? v : d)
+  const status: QuoteStatus = QUOTE_STATUSES.includes(q.status as QuoteStatus) ? (q.status as QuoteStatus) : 'draft'
+  const cur = q.currency === 'EUR' || q.currency === 'USD' ? q.currency : 'TRY'
+  const parts = Array.isArray(q.parts) ? q.parts.filter((p) => p && typeof p.name === 'string').map((p) => ({ name: p.name, quantity: num(p.quantity, 1), size: (Array.isArray(p.size) && p.size.length === 3 ? p.size.map((x) => num(x)) : [0, 0, 0]) as [number, number, number] })) : []
+  return {
+    id: q.id, quoteNo: str(q.quoteNo, q.id), date: str(q.date, new Date(0).toISOString()), customerId: typeof q.customerId === 'string' ? q.customerId : null, customerName: str(q.customerName),
+    status, note: str(q.note), model: str(q.model), parts, printer: str(q.printer), tech: q.tech === 'resin' ? 'resin' : 'fdm', material: str(q.material), qty: num(q.qty, 1),
+    unit: num(q.unit), total: q.total, vatRate: num(q.vatRate), currency: cur, fxRate: num(q.fxRate, 1), leadDays: num(q.leadDays, 1), basis: str(q.basis),
+    cost: num(q.cost), grams: num(q.grams), timeSec: num(q.timeSec), plates: num(q.plates, 1), shared: q.shared as SharedQuote, thumb: typeof q.thumb === 'string' ? q.thumb : null,
+  }
+}
+export function normalizeCustomer(raw: unknown): CustomerRecord | null {
+  if (!raw || typeof raw !== 'object') return null
+  const c = raw as Partial<CustomerRecord>
+  if (typeof c.id !== 'string' || typeof c.name !== 'string') return null
+  const str = (v: unknown, d = '') => (typeof v === 'string' ? v : d)
+  const now = new Date().toISOString()
+  return { id: c.id, name: c.name, company: str(c.company), phone: str(c.phone), email: str(c.email), note: str(c.note), createdAt: str(c.createdAt, now), updatedAt: str(c.updatedAt, now) }
+}
+
 /** Teklif listesi CSV'si (Excel ; ayracı, UTF-8 BOM) */
-export function quotesCsv(rows: QuoteRecord[], statusLabel: (s: QuoteStatus) => string): string {
+export function quotesCsv(rows: QuoteRecord[], statusLabel: (s: QuoteStatus) => string, t?: (k: string) => string): string {
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
-  const head = ['Tarih', 'Teklif No', 'Müşteri', 'Model', 'Yazıcı', 'Malzeme', 'Adet', 'Birim (KDV hariç)', 'Toplam (KDV hariç)', 'KDV %', 'Para birimi', 'Maliyet (TRY)', 'Teslim (gün)', 'Durum', 'Not']
+  const h = (k: string, fb: string) => { const v = t ? t(`csv.${k}`) : `csv.${k}`; return v === `csv.${k}` ? fb : v }
+  const head = [h('date', 'Tarih'), h('quoteNo', 'Teklif No'), h('customer', 'Müşteri'), h('model', 'Model'), h('printer', 'Yazıcı'), h('material', 'Malzeme'), h('qty', 'Adet'), h('unitExVat', 'Birim (KDV hariç)'), h('totalExVat', 'Toplam (KDV hariç)'), h('vatPct', 'KDV %'), h('currency', 'Para birimi'), h('costTry', 'Maliyet (TRY)'), h('leadDays', 'Teslim (gün)'), h('status', 'Durum'), h('note', 'Not')]
   const toCur = (q: QuoteRecord, tryAmt: number) => (q.currency === 'TRY' ? tryAmt : tryAmt / (q.fxRate || 1)).toFixed(2)
   const lines = rows.map((q) => [q.date.slice(0, 10), q.quoteNo, q.customerName, q.model, q.printer, q.material, q.qty, toCur(q, q.unit), toCur(q, q.total), Math.round(q.vatRate * 100), q.currency, q.cost.toFixed(2), q.leadDays, statusLabel(q.status), q.note])
   return '﻿' + [head, ...lines].map((r) => r.map(esc).join(';')).join('\r\n')

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
+/** Kota dolunca window'a gönderilen olay (uygulama kullanıcıya bildirim gösterir) */
+export const STORAGE_QUOTA_EVENT = 'fdm-sla-calc:quota'
+
 /**
  * Versiyonlu localStorage; okuma/yazma hataları (gizli mod vb.) sessizce yutulur.
  * localStorage yalnızca mount sonrasında okunur: ilk render her zaman `initial`
@@ -20,6 +23,13 @@ export function useLocalStorage<T>(key: string, initial: T, merge?: (stored: unk
       }
     } catch { /* yok say */ }
     setLoaded(true)
+    // Başka sekmede yazılan değeri al (storage olayı yalnızca diğer sekmelerde tetiklenir)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== key || e.newValue == null) return
+      try { const parsed = JSON.parse(e.newValue); setValue(merge ? merge(parsed, initial) : (parsed as T)) } catch { /* yok say */ }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
     // key sabittir; yalnızca ilk mount'ta oku.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -31,7 +41,10 @@ export function useLocalStorage<T>(key: string, initial: T, merge?: (stored: unk
     } catch (e) {
       // Kota dolduysa (ör. büyük logo/görsel) uygulamayı çökertmeden uyar.
       const quota = e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)
-      if (quota) console.warn(`[useLocalStorage] "${key}" kaydedilemedi: tarayıcı depolama kotası dolu. Daha küçük bir logo/görsel kullanmayı deneyin.`)
+      if (quota) {
+        console.warn(`[useLocalStorage] "${key}" kaydedilemedi: tarayıcı depolama kotası dolu. Daha küçük bir logo/görsel kullanmayı deneyin.`)
+        try { window.dispatchEvent(new CustomEvent(STORAGE_QUOTA_EVENT, { detail: { key } })) } catch { /* yok say */ }
+      }
     }
   }, [key, value, loaded])
   const reset = useCallback(() => setValue(initial), [initial])

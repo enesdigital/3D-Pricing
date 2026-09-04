@@ -52,7 +52,7 @@ export function CalibrationPanel({ records, factors, printers, materials, curren
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
           <div className="mb-2 text-xs font-medium text-zinc-300">{t('calibration.manual')} — {current.modelName}: {formatDuration(current.modelTimeSec, t)}, {current.modelGrams.toFixed(1)} g</div>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="text-xs text-zinc-400">{t('calibration.actualTime')}<NumberInput value={actualMin} onChange={setActualMin} min={0} step={1} suffix="dk" className="w-28" /></label>
+            <label className="text-xs text-zinc-400">{t('calibration.actualTime')}<NumberInput value={actualMin} onChange={setActualMin} min={0} step={1} suffix={t('units.min')} className="w-28" /></label>
             <label className="text-xs text-zinc-400">{t('calibration.actualGrams')}<NumberInput value={actualG} onChange={setActualG} min={0} step={0.1} suffix="g" className="w-28" /></label>
             <Button variant="primary" disabled={actualMin <= 0 || actualG <= 0} onClick={() => {
               onAdd({ id: `cal-${Date.now().toString(36)}`, date: new Date().toISOString(), ...current, actualTimeSec: actualMin * 60, actualGrams: actualG })

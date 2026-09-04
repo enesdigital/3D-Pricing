@@ -196,7 +196,8 @@ export function fdmPartModel(input: CommonInput & { params: FdmPrintParams }): F
   }
   return {
     layerExtrude, lh, layerCount, supportTimeSec: supportVolume / qBulk, partGrams, supportGrams,
-    slicerPerPartSec: useSlicer ? Math.max(0, input.slicer!.partTimeSec - spec.jobOverheadSec) : null,
+    // Dosya süresi tek bir iş başlangıcı içerir: parça başına overhead = overhead ÷ dosyadaki parça sayısı
+    slicerPerPartSec: useSlicer ? Math.max(0, input.slicer!.partTimeSec - spec.jobOverheadSec / Math.max(1, input.slicer!.partsInFile)) : null,
     basis: useSlicer ? 'slicer' : calib ? 'calibrated' : 'model',
     footprint: stats.size.x * stats.size.y, modelVolume, supportVolume, wallVolume, skinVolume, infillVolume,
   }
@@ -330,6 +331,14 @@ export function resinPlateTime(plate: { layerCount: number; fill: number }, ctx:
   const layersTime = bottom * (params.bottomExposureSec + params.liftCycleSec) + normal * (params.exposureSec + params.liftCycleSec)
   return 60 + layersTime * (1 + penalty) * settings.timeMultiplier * (calib?.timeFactor ?? 1)
 }
+/** Reçine destek hacmi (mm³): sütunlar + raft, en az destek oranı, üst sınır hacmin %60'ı + raft */
+export function resinSupportVolume(stats: MeshStats, params: ResinPrintParams): number {
+  const needsSupport = params.supports === 'on' || (params.supports === 'auto' && (stats.overhangArea > 4 || stats.bedContactArea < stats.footprintArea * 0.5))
+  if (!needsSupport) return 0
+  const pillars = stats.supportColumnVolume * 0.04
+  const raft = stats.size.x * stats.size.y * 0.35
+  return Math.min(Math.max(pillars + raft, stats.volume * params.supportRatio), stats.volume * 0.6 + raft)
+}
 export function resinPlateEnergyKWh(spec: ResinPrinterSpec, settings: BusinessSettings, plateSec: number): number {
   return ((plateSec / 3600) * spec.avgPowerW + (settings.resinPostMinutes / 60) * spec.postPowerW) / 1000
 }
@@ -352,13 +361,7 @@ export function estimateResin(input: CommonInput & { params: ResinPrintParams },
     modelVolume = shell + (volume - shell) * params.hollowResidualRatio
     hollowSaved = volume - modelVolume
   }
-  let supportVolume = 0
-  const needsSupport = params.supports === 'on' || (params.supports === 'auto' && (stats.overhangArea > 4 || stats.bedContactArea < stats.footprintArea * 0.5))
-  if (needsSupport) {
-    const pillars = stats.supportColumnVolume * 0.04
-    const raft = stats.size.x * stats.size.y * 0.35 * 1.0
-    supportVolume = Math.min(Math.max(pillars + raft, volume * params.supportRatio), volume * 0.6 + raft)
-  }
+  const supportVolume = resinSupportVolume(stats, params)
   const wasteRatio = 0.08
   const calib = input.calibration && input.calibration.samples > 0 ? input.calibration : null
   const partGrams = gramsFromMm3(modelVolume, material.density) * (calib?.gramsFactor ?? 1)
@@ -440,14 +443,14 @@ export function priceLines(a: { t: Translate; tech: Tech; settings: BusinessSett
 }
 
 /** Geometriye bağlı uyarılar (sığma, kenar payı, manifold, DFM) */
-export function geometryWarnings(a: { t: Translate; tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean; thinness?: { fraction: number; thresholdMm: number; p5: number } | null }): string[] {
+export function geometryWarnings(a: { t: Translate; tech: Tech; stats: MeshStats; printer: PrinterProfile; settings: BusinessSettings; qty: number; partsPerPlate: number; plates: number; marginViolated: boolean; thinness?: { fraction: number; thresholdMm: number; p5: number } | null; /** Sığma/tabla uyarıları başka yerde verildi (proje) */ skipFit?: boolean }): string[] {
   const { t, settings, stats, printer, qty } = a
   const fit = checkFit(stats, printer)
   const warnings: string[] = []
-  if (!fit.fits && fit.fitsRotated) warnings.push(t('cost.warn.rotatedFit'))
+  if (!a.skipFit && !fit.fits && fit.fitsRotated) warnings.push(t('cost.warn.rotatedFit'))
   if (a.marginViolated) warnings.push(t('cost.warn.marginTight', { m: settings.plateMarginMm }))
-  if (fit.fitsRotated && qty > a.partsPerPlate) warnings.push(t('cost.warn.multiPlate', { qty, n: a.partsPerPlate, p: a.plates }))
-  if (!fit.fitsRotated) warnings.push(t('cost.warn.noFit', { x: stats.size.x.toFixed(0), y: stats.size.y.toFixed(0), z: stats.size.z.toFixed(0), bx: printer.bed.x, by: printer.bed.y, bz: printer.bed.z }))
+  if (!a.skipFit && fit.fitsRotated && qty > a.partsPerPlate) warnings.push(t('cost.warn.multiPlate', { qty, n: a.partsPerPlate, p: a.plates }))
+  if (!a.skipFit && !fit.fitsRotated) warnings.push(t('cost.warn.noFit', { x: stats.size.x.toFixed(0), y: stats.size.y.toFixed(0), z: stats.size.z.toFixed(0), bx: printer.bed.x, by: printer.bed.y, bz: printer.bed.z }))
   if (stats.manifold.checked && !stats.manifold.isClosed) warnings.push(t('cost.warn.notClosed', { o: stats.manifold.openEdges, nm: stats.manifold.nonManifoldEdges }))
   if (stats.invertedWinding) warnings.push(t('cost.warn.inverted'))
   // Basılabilirlik (DFM) uyarıları

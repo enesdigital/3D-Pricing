@@ -14,10 +14,14 @@ const cfg = `<config><object id="1"><metadata key="extruder" value="1"/></object
 const zip = zipSync({ '3D/3dmodel.model': strToU8(cubeXml), 'Metadata/model_settings.config': strToU8(cfg), '[Content_Types].xml': strToU8('<Types/>') })
 const p = parse3mf(zip.buffer as ArrayBuffer)
 const { stats } = analyzeMesh(p.positions, { overhangThresholdDeg: 45, manifoldCheck: true, layerHeight: 0.2 })
+const assert = (c: boolean, msg: string) => { if (!c) { console.error('FAIL:', msg); process.exit(1) } }
+assert(p.triangleCount === 24 && p.unit === 25.4 && p.objectCount === 2 && Math.abs(stats.volume / 1000 - 32.8) < 0.2 && stats.manifold.components === 2, '3mf ayrıştırma (birim, nesne, hacim)')
 console.log('3mf: üçgen', p.triangleCount, '| birim ×', p.unit, '| nesne', p.objectCount, '| renk ipucu', p.colorHint, '| boyut', [stats.size.x, stats.size.y, stats.size.z].map((v) => v.toFixed(1)).join('x'), '| hacim', (stats.volume / 1000).toFixed(1), 'cm³ (beklenen 2×16.39=32.8)', '| kabuk', stats.manifold.components)
 // Sadeleştirme: piyon 2304 üçgen → 600
 const pawn = parseStl(await makeSamplePawnStl().arrayBuffer())
 const w = weld(pawn.positions); console.log('weld: köşe', pawn.positions.length / 3, '→', w.positions.length / 3)
 const dec = await decimateForDisplay(pawn.positions, 600)
 const { stats: sd } = analyzeMesh(dec, { overhangThresholdDeg: 45, manifoldCheck: false, layerHeight: 0.2 })
+assert(w.positions.length < pawn.positions.length && dec.length / 9 <= 600 && Math.abs(sd.volume - stats.volume) / stats.volume < 0.02, 'weld/decimate hacmi korunmalı')
 console.log('decimate: üçgen', pawn.triangleCount, '→', dec.length / 9, '| hacim', (stats.volume / 1000).toFixed(2), 'vs', (sd.volume / 1000).toFixed(2), 'cm³ (piyon 33.04)')
+console.log('import: OK')

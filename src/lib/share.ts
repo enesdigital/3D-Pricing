@@ -1,6 +1,6 @@
 import LZ from 'lz-string'
 const { compressToEncodedURIComponent, decompressFromEncodedURIComponent } = LZ
-import type { BusinessSettings, Estimate, Material, PrinterProfile } from './cost/types.ts'
+import type { BusinessSettings, Estimate, Material, PrinterProfile, Translate } from './cost/types.ts'
 import type { QuotePricing } from './pdf/quote.ts'
 
 /** Sunucusuz paylaşım için teklif özeti (URL hash'ine sıkıştırılır) */
@@ -62,18 +62,20 @@ export function whatsappUrl(number: string, text: string): string {
 }
 
 /** Kalemler + toplamlar CSV (Excel'in ; ayracı ve UTF-8 BOM ile) */
-export function quoteCsv(est: Estimate, pricing: QuotePricing, meta: { model: string; printer: string; material: string; currency: string }): string {
+export function quoteCsv(est: Estimate, pricing: QuotePricing, meta: { model: string; printer: string; material: string; currency: string }, t?: Translate): string {
+  const tr = t ?? ((k: string) => k)
+  const h = (k: string, fb: string) => { const v = tr(`csv.${k}`); return v === `csv.${k}` ? fb : v }
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
   const rows: (string | number)[][] = [
-    ['Model', meta.model], ['Yazıcı', meta.printer], ['Malzeme', meta.material], ['Adet', est.quantity], ['Para birimi (hesap)', 'TRY'], [],
-    ['Kalem', 'Açıklama', 'Tutar (TRY)'],
+    [h('model', 'Model'), meta.model], [h('printer', 'Yazıcı'), meta.printer], [h('material', 'Malzeme'), meta.material], [h('qty', 'Adet'), est.quantity], [h('calcCurrency', 'Para birimi (hesap)'), 'TRY'], [],
+    [h('item', 'Kalem'), h('detail', 'Açıklama'), h('amount', 'Tutar (TRY)')],
     ...est.lines.map((l) => [l.label, l.detail ?? '', l.amount.toFixed(2)]),
-    ['Toplam maliyet', '', est.total.cost.toFixed(2)],
-    ['Birim fiyat (KDV hariç)', '', pricing.unitPrice.toFixed(2)],
-    ['Toplam (KDV hariç)', '', pricing.total.toFixed(2)],
-    [`KDV %${Math.round(pricing.vatRate * 100)}`, '', (pricing.total * pricing.vatRate).toFixed(2)],
-    ['Genel toplam', '', (pricing.total * (1 + pricing.vatRate)).toFixed(2)],
-    [], ['Malzeme toplam (g)', est.total.materialGrams.toFixed(1)], ['Süre toplam (sa)', (est.total.printTimeSec / 3600).toFixed(2)], ['Enerji (kWh)', est.total.energyKWh.toFixed(2)], ['Tabla', est.plates], ['Teslim (iş günü)', est.leadDays],
+    [h('totalCost', 'Toplam maliyet'), '', est.total.cost.toFixed(2)],
+    [h('unitExVat', 'Birim fiyat (KDV hariç)'), '', pricing.unitPrice.toFixed(2)],
+    [h('totalExVat', 'Toplam (KDV hariç)'), '', pricing.total.toFixed(2)],
+    [`${h('vat', 'KDV')} %${Math.round(pricing.vatRate * 100)}`, '', (pricing.total * pricing.vatRate).toFixed(2)],
+    [h('grandTotal', 'Genel toplam'), '', (pricing.total * (1 + pricing.vatRate)).toFixed(2)],
+    [], [h('materialTotal', 'Malzeme toplam (g)'), est.total.materialGrams.toFixed(1)], [h('timeTotal', 'Süre toplam (sa)'), (est.total.printTimeSec / 3600).toFixed(2)], [h('energy', 'Enerji (kWh)'), est.total.energyKWh.toFixed(2)], [h('plates', 'Tabla'), est.plates], [h('lead', 'Teslim (iş günü)'), est.leadDays],
   ]
   return '﻿' + rows.map((r) => r.map(esc).join(';')).join('\r\n')
 }
@@ -87,11 +89,15 @@ export function downloadText(name: string, text: string, type = 'text/plain') {
 
 /** Ayar/veri yedeği: uygulamanın tüm localStorage anahtarları */
 export const BACKUP_KEYS = ['settings', 'materialPrices', 'printerOverrides', 'customPrinters', 'customMaterials', 'calibrations', 'fdmParams', 'resinParams', 'printerId', 'materialIdByTech', 'manifoldCheck', 'thicknessCheck', 'quoteLogo', 'theme', 'lang']
+/** JSON değil düz dize olarak saklanan anahtarlar (tema/dil) */
+const RAW_KEYS = new Set(['theme', 'lang'])
 export function exportBackup(prefix: string, history?: { quotes: unknown[]; customers: unknown[] }): string {
   const out: Record<string, unknown> = { app: '3D-Pricing', version: 2, exportedAt: new Date().toISOString(), data: {} }
   for (const k of BACKUP_KEYS) {
     const raw = localStorage.getItem(prefix + k)
-    if (raw != null) { try { (out.data as Record<string, unknown>)[k] = JSON.parse(raw) } catch { (out.data as Record<string, unknown>)[k] = raw } }
+    if (raw == null) continue
+    if (RAW_KEYS.has(k)) { (out.data as Record<string, unknown>)[k] = raw.replace(/^"|"$/g, ''); continue }
+    try { (out.data as Record<string, unknown>)[k] = JSON.parse(raw) } catch { (out.data as Record<string, unknown>)[k] = raw }
   }
   if (history) out.history = history
   return JSON.stringify(out, null, 2)
@@ -102,7 +108,10 @@ export function importBackup(prefix: string, text: string): { n: number; history
   if (j.app !== '3D-Pricing' || !j.data || typeof j.data !== 'object') throw new Error('Geçersiz yedek dosyası')
   let n = 0
   for (const k of BACKUP_KEYS) {
-    if (k in j.data) { localStorage.setItem(prefix + k, JSON.stringify(j.data[k])); n++ }
+    if (!(k in j.data)) continue
+    const v = j.data[k]
+    // Tema/dil düz dize yazılır; aksi halde tırnaklı değer sınıf adı/dil kodu olarak eşleşmez
+    localStorage.setItem(prefix + k, RAW_KEYS.has(k) ? String(v).replace(/^"|"$/g, '') : JSON.stringify(v)); n++
   }
   return { n, history: j.history && typeof j.history === 'object' ? j.history : null }
 }

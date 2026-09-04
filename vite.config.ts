@@ -32,8 +32,10 @@ export default defineConfig({
       },
       workbox: {
         // Uygulama kabuğu + parçalar önbelleğe alınır; 7,6 MB occt WASM'ı ilk kullanımda çalışma zamanında saklanır
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/occt-import-js*.wasm'],
+        // PDF yazı tipleri (DejaVu .ttf) de dahil: çevrimdışı teklif PDF'i üretilebilsin
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,ttf}'],
+        // occt WASM çalışma zamanında; html2canvas jsPDF'in kullanılmayan html() yolu
+        globIgnores: ['**/occt-import-js*.wasm', '**/html2canvas-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,

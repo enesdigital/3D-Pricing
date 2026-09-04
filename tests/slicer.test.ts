@@ -46,8 +46,11 @@ const show = (label: string, d: ReturnType<typeof parseGcodeText>) => console.lo
 show('bambu', parseGcodeText(bambu, 'a.gcode'))
 show('prusa', parseGcodeText(prusa, 'b.gcode'))
 const c = parseGcodeText(cura, 'c.gcode'); show('cura', c)
+const assert = (c: boolean, msg: string) => { if (!c) { console.error('FAIL:', msg); process.exit(1) } }
+assert(Math.abs(gramsFromLength(1000, 1.24) - 2.98) < 0.05, 'gramsFromLength: 1 m 1.75 mm PLA ≈ 2.98 g')
 console.log('cura gram (PLA 1.24):', gramsFromLength(c.filamentMm!, 1.24).toFixed(2), 'g')
 console.log('süre:', ['1d 2h 3m 4s', '1h 20m 5s', '45m', '3661', '01:02:03', 'abc'].map((s) => `${s}→${parseDuration(s)}`).join(' | '))
+assert(parseDuration('1d 2h 3m 4s') === 93784 && parseDuration('1h 20m 5s') === 4805 && parseDuration('45m') === 2700 && parseDuration('01:02:03') === 3723 && parseDuration('abc') == null, 'süre ayrıştırma')
 const recs: CalibrationRecord[] = [
   { id: '1', date: '', printerId: 'a1', materialId: 'pla', presetKey: '', modelName: '', modelTimeSec: 3600, actualTimeSec: 4200, modelGrams: 20, actualGrams: 22 },
   { id: '2', date: '', printerId: 'a1', materialId: 'pla', presetKey: '', modelName: '', modelTimeSec: 1000, actualTimeSec: 1300, modelGrams: 10, actualGrams: 10.5 },
@@ -57,3 +60,5 @@ const recs: CalibrationRecord[] = [
 console.log('kalib a1+pla:', JSON.stringify(calibrationFactors(recs, 'a1', 'pla')))
 console.log('kalib a1+asa (yazıcı geneli):', JSON.stringify(calibrationFactors(recs, 'a1', 'asa')))
 console.log('kalib x2d (yok):', JSON.stringify(calibrationFactors(recs, 'x2d', 'pla')))
+{ const f = calibrationFactors(recs, 'a1', 'pla'), g = calibrationFactors(recs, 'x2d', 'pla'); assert(f.samples > 0 && f.scope === 'printer+material' && f.timeFactor > 0 && g.samples === 0 && g.timeFactor === 1, 'kalibrasyon kapsamı') }
+console.log('slicer: OK')
