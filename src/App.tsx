@@ -28,6 +28,7 @@ import { QuoteDialog } from './components/QuoteDialog.tsx'
 import { SlicerImport } from './components/SlicerImport.tsx'
 import { SharedQuoteView } from './components/SharedQuoteView.tsx'
 import { HistoryDialog } from './components/HistoryDialog.tsx'
+import { PwaToast } from './components/PwaToast.tsx'
 import { buildQuoteRecord, historyAvailable, makeThumb, saveQuote, upsertCustomerByName } from './lib/history/index.ts'
 import { makeQuoteNo } from './lib/pdf/quote.ts'
 import { readShareFromHash, type SharedQuote } from './lib/share.ts'
@@ -576,6 +577,7 @@ export default function App() {
           }}
         />
       )}
+      <PwaToast />
       <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} whatsappNumber={settings.whatsappNumber ?? ''} />
       {shared && <SharedQuoteView quote={shared} onClose={() => { setShared(null); history.replaceState(null, '', location.pathname + location.search) }} />}
       <PrinterEditor

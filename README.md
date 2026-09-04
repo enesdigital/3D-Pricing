@@ -21,6 +21,7 @@ STL (veya OBJ) dosyası yükleyin; **Bambu Lab A1 Combo**, **Bambu Lab X2D Combo
 - Dahili katalog: 4 Türk perakendecisinden (3dultra, robo90, rhino3dprinter, metatechtr) derlenen ~150 FDM/reçine yazıcı ve ~390 filament/reçine (marka + tür bazında, kg fiyatı medyan; fiyatı olmayan ya da siteler arasında tabla/fiyat/kasa bilgisi çelişen kayıtlar atılır). `scripts/build-catalog.py` JSON kaynaklarını (`scripts/catalog/`) tekilleştirip `src/data/catalog.ts` üretir; teknik parametreler sınıf sezgileriyle türetilir (elle doğrulanmış 9 profil `printers.ts` içinde önceliklidir)
 - Kendi yazıcınızı ve malzemenizi ekleyebilirsiniz (şablondan kopyalayarak); özel yazıcı/malzemeler yalnızca o tarayıcının localStorage'ında saklanır, kimseyle paylaşılmaz
 - Müşteriye gönderilebilir **teklif PDF'i**: firma bilgisi ve logo (PNG/JPEG/SVG, tarayıcıda saklanır), 3B görünümden model görseli, kalemsiz fiyat tablosu (kâr marjı ya da elle girilen birim/toplam fiyat), KDV, isteğe bağlı üretim bilgisi; Türkçe karakterler için gömülü DejaVu Sans
+- **PWA / çevrimdışı:** uygulama kabuğu, worker ve kütüphane parçaları servis çalışanıyla önbelleğe alınır (vite-plugin-pwa, Workbox); STEP için 7,6 MB WASM ilk kullanımda saklanır, döviz kuru ağ öncelikli. Ana ekrana eklenebilir (manifest + ikonlar `scripts/make-icons.mjs` ile üretilir); yeni sürüm “Yenile” bildirimiyle gelir, çalışma kesilmez
 - Tüm fiyat/parametreler tarayıcıda (localStorage) saklanır; yazdır çıktısı
 
 ## Geliştirme

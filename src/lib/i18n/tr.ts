@@ -254,6 +254,11 @@ export const tr = {
     saveBtn: `💾 Kaydet`,
     saveHint: `PDF indirmeden geçmişe kaydeder`,
   },
+  pwa: {
+    offlineReady: `Uygulama çevrimdışı kullanıma hazır.`,
+    needRefresh: `Yeni sürüm hazır.`,
+    reload: `Yenile`,
+  },
   fileDrop: {
     addCompact: `Projeye parça eklemek için dosya bırakın veya tıklayın`,
     compact: `Başka bir dosya yüklemek için tıklayın veya sürükleyin`,

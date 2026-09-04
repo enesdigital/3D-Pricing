@@ -256,6 +256,11 @@ export const en: Dict = {
     saveBtn: `💾 Save`,
     saveHint: `Saves to history without downloading a PDF`,
   },
+  pwa: {
+    offlineReady: `App is ready to work offline.`,
+    needRefresh: `A new version is available.`,
+    reload: `Reload`,
+  },
   fileDrop: {
     addCompact: `Drop or click to add a part to the project`,
     compact: `Click or drag to upload another file`,
