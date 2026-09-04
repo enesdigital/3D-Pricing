@@ -29,6 +29,7 @@ export const effectiveScale = (p: Placement) => {
 export const DEFAULT_PLACEMENT: Placement = { rotX: 0, rotY: 0, rotZ: 0, unit: 1, scalePct: 100 }
 
 import type { LayerProfile } from './slice.ts'
+import type { OrientationMetrics } from './orient.ts'
 
 export interface MeshStats {
   triangleCount: number
@@ -77,9 +78,12 @@ export type WorkerRequest =
   | { type: 'analyze'; id: number; partId: string; placement: Placement; overhangThresholdDeg: number; manifoldCheck: boolean; layerHeight: number; thickness: boolean }
   /** partId verilmezse tüm parçalar bırakılır */
   | { type: 'unload'; partId?: string }
+  /** Otomatik yönlendirme adaylarını puanla */
+  | { type: 'orient'; id: number; partId: string; placement: Placement; overhangThresholdDeg: number; tech: 'fdm' | 'resin' }
 
 export type WorkerResponse =
-  | { type: 'progress'; id: number; phase: 'parse' | 'analyze'; fraction: number }
+  | { type: 'progress'; id: number; phase: 'parse' | 'analyze' | 'orient'; fraction: number }
   | { type: 'loaded'; id: number; positions: Float32Array; triangleCount: number; format: string; unit?: number; colorHint?: number | null; objectCount?: number; decimated?: boolean }
   | { type: 'analyzed'; id: number; stats: MeshStats; overhangMask: Uint8Array; thickness: ThicknessData | null }
+  | { type: 'oriented'; id: number; candidates: OrientationMetrics[] }
   | { type: 'error'; id: number; message: string }

@@ -284,6 +284,23 @@ export const tr = {
     inherits: `Kısmi profil (“{name}” üzerinden miras alır): eksik alanlar mevcut değerlerden tamamlandı.`,
     costNote: `Profildeki maliyet {cost} (dilimleyici para birimi); ₺/kg değerini elle girin.`,
   },
+  orient: {
+    button: `⟳ Otomatik yönlendir`,
+    busy: `Hesaplanıyor…`,
+    title: `Yönlendirme önerileri (90° adım)`,
+    metrics: `yükseklik {h} mm · destek {sup} cm³ · sarkma {over} cm² · tabla {bed} cm²`,
+    apply: `Uygula`,
+    current: `mevcut`,
+    hint: `FDM'de destek hacmi ve sarkma önce, yükseklik ve tabla teması sonra; reçinede taban alanı (ayrılma kuvveti) da hesaba katılır. 45° gibi ara açılar denenmez.`,
+  },
+  exposure: {
+    recommended: `Önerilen pozlama ({lh} mm): {exp} s · taban {bottom} s × {layers} katman`,
+    lift: ` · kaldırma döngüsü ≈ {s} s`,
+    apply: `Uygula`,
+    applied: `uygulandı`,
+    derived: ` · türetilmiş başlangıç değeri, kalibre edin`,
+    type: { standard: `standart reçine`, water: `su ile yıkanabilir`, abslike: `ABS-like / dayanıklı`, highres: `yüksek detay`, clear: `şeffaf`, other: `diğer reçine` },
+  },
   fileDrop: {
     addCompact: `Projeye parça eklemek için dosya bırakın veya tıklayın`,
     compact: `Başka bir dosya yüklemek için tıklayın veya sürükleyin`,

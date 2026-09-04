@@ -27,6 +27,7 @@ import { imageSize } from './lib/pdf/image.ts'
 import { QuoteDialog } from './components/QuoteDialog.tsx'
 import { SlicerImport } from './components/SlicerImport.tsx'
 import { ProfileImport } from './components/ProfileImport.tsx'
+import { recommendedExposure } from './data/resinExposure.ts'
 import { SharedQuoteView } from './components/SharedQuoteView.tsx'
 import { HistoryDialog } from './components/HistoryDialog.tsx'
 import { PwaToast } from './components/PwaToast.tsx'
@@ -363,6 +364,13 @@ export default function App() {
     } catch (e) { console.warn('quote history save failed', e); return false }
   }, [shownEstimate, material, customer, projectMode, projectEstimate, projectParts, stats, mesh.model, qty, modelImage, settings, printer, projectFileName])
   const cmpQty = shownEstimate?.quantity ?? qty
+  /** Reçine: yazıcı × reçine türü × katman kalınlığı için önerilen pozlama */
+  const exposureRec = useMemo(() => (printer.tech === 'resin' ? recommendedExposure(printer, material, resinParams.layerHeight) : null), [printer, material, resinParams.layerHeight])
+  const { orient: meshOrient } = mesh
+  const onAutoOrient = useCallback(() => {
+    if (!activeId) return Promise.resolve([])
+    return meshOrient(activeId, { placement, overhangThresholdDeg, tech: printer.tech })
+  }, [activeId, meshOrient, placement, overhangThresholdDeg, printer.tech])
   const resetAll = () => { resetSettings(); resetMaterialPrices(); resetPrinterOverrides() }
 
   return (
@@ -414,6 +422,7 @@ export default function App() {
                   model={mesh.model} stats={stats} placement={placement} onPlacement={setPlacement}
                   manifoldCheck={manifoldCheck} onManifoldCheck={setManifoldCheck} onClear={() => (projectMode && activeId ? mesh.remove(activeId) : mesh.clear())}
                   thicknessCheck={thicknessCheck} onThicknessCheck={setThicknessCheck} thickness={thickness} thinness={thinness}
+                  onAutoOrient={onAutoOrient}
                 />
               </Card>
               <FileDrop onFile={onFile} compact />
@@ -469,7 +478,7 @@ export default function App() {
           <Card title={printer.tech === 'fdm' ? t('cards.fdmSettings') : t('cards.resinSettings')}>
             {printer.tech === 'fdm'
               ? <FdmParamsPanel params={fdmParams} onChange={setFdmParams} printer={printer} />
-              : <ResinParamsPanel params={resinParams} onChange={setResinParams} />}
+              : <ResinParamsPanel params={resinParams} onChange={setResinParams} recommendation={exposureRec} />}
           </Card>
         </div>
 

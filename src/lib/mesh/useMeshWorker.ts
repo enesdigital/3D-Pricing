@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_PLACEMENT, type MeshStats, type Placement, type ThicknessData, type WorkerRequest, type WorkerResponse } from './types.ts'
 import type { Translate } from '../cost/types.ts'
+import type { OrientationMetrics } from './orient.ts'
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024 // 200 MB üst sınır
 /** Bir projedeki en fazla parça (bellek: her parçanın görüntü kopyası ana iş parçacığında, orijinali worker'da) */
@@ -68,7 +69,8 @@ export function useMeshWorker(t: Translate) {
   // İstek kimlikleri: parça başına en son yükleme/analiz kimliği tutulur; eski cevaplar yok sayılır.
   const reqSeq = useRef(0)
   const latest = useRef(new Map<string, { load: number; analyze: number }>())
-  const pending = useRef(new Map<number, { partId: string; kind: 'load' | 'analyze'; placement?: Placement }>())
+  const pending = useRef(new Map<number, { partId: string; kind: 'load' | 'analyze' | 'orient'; placement?: Placement }>())
+  const orientWaiters = useRef(new Map<number, { resolve: (c: OrientationMetrics[]) => void; reject: (e: Error) => void }>())
   const [state, setState] = useState<MeshWorkerState>({ parts: [], activeId: null, busy: 'idle', progress: 0, error: null })
   // Olay işleyicilerinde güncel state'i senkron okumak için (setState güncelleyicisi ertelenebilir)
   const stateRef = useRef(state)
@@ -111,6 +113,13 @@ export function useMeshWorker(t: Translate) {
           }))
           return
         }
+        case 'oriented': {
+          pending.current.delete(msg.id)
+          orientWaiters.current.get(msg.id)?.resolve(msg.candidates)
+          orientWaiters.current.delete(msg.id)
+          setState((s) => idleIfDone({ ...s, parts: markPending(s.parts) }))
+          return
+        }
         case 'analyzed': {
           const req = pending.current.get(msg.id)
           pending.current.delete(msg.id)
@@ -130,6 +139,8 @@ export function useMeshWorker(t: Translate) {
           // id -1: worker genel hatası (self.onerror) → hangi istek olduğu bilinmez, bekleyenlerin hepsi düşer
           const req = pending.current.get(msg.id)
           if (msg.id === -1) pending.current.clear(); else pending.current.delete(msg.id)
+          const waiter = orientWaiters.current.get(msg.id)
+          if (waiter) { waiter.reject(new Error(msg.message)); orientWaiters.current.delete(msg.id); setState((s) => idleIfDone({ ...s, parts: markPending(s.parts) })); return }
           setState((s) => {
             let parts = s.parts
             if (req?.kind === 'load') parts = parts.filter((p) => !(p.id === req.partId && !p.loaded))
@@ -235,6 +246,19 @@ export function useMeshWorker(t: Translate) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** Otomatik yönlendirme adayları (puan sırasıyla) */
+  const orient = useCallback((partId: string, opts: { placement: Placement; overhangThresholdDeg: number; tech: 'fdm' | 'resin' }): Promise<OrientationMetrics[]> => {
+    return new Promise((resolve, reject) => {
+      if (!latest.current.has(partId)) { reject(new Error('part')); return }
+      const id = ++reqSeq.current
+      pending.current.set(id, { partId, kind: 'orient' })
+      orientWaiters.current.set(id, { resolve, reject })
+      setState((s) => ({ ...s, parts: markPending(s.parts), busy: 'analyzing', progress: 0 }))
+      try { send({ type: 'orient', id, partId, ...opts }) } catch (e) { pending.current.delete(id); orientWaiters.current.delete(id); reject(e instanceof Error ? e : new Error(String(e))) }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const remove = useCallback((partId: string) => {
     latest.current.delete(partId)
     for (const [k, v] of pending.current) if (v.partId === partId) pending.current.delete(k)
@@ -267,6 +291,6 @@ export function useMeshWorker(t: Translate) {
     /** Etkin parçanın modeli (tek modelli akışla uyumluluk) */
     model: active?.model ?? null,
     analysis: active?.analysis ?? emptyAnalysis,
-    loadFile, analyze, remove, clear, setActive, setQuantity, setPlacement,
+    loadFile, analyze, orient, remove, clear, setActive, setQuantity, setPlacement,
   }
 }

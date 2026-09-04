@@ -2,6 +2,7 @@ import type { FdmPrintParams, PrinterProfile, ResinPrintParams } from '../lib/co
 import { FDM_PRESETS } from '../data/defaults.ts'
 import { Field, NumberInput, Select, Toggle } from './ui.tsx'
 import { useI18n } from '../lib/i18n/index.tsx'
+import type { ExposureRecommendation } from '../data/resinExposure.ts'
 
 export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrintParams; onChange: (p: FdmPrintParams) => void; printer: PrinterProfile }) {
   const { t } = useI18n()
@@ -61,8 +62,11 @@ export function FdmParamsPanel({ params, onChange, printer }: { params: FdmPrint
   )
 }
 
-export function ResinParamsPanel({ params, onChange }: { params: ResinPrintParams; onChange: (p: ResinPrintParams) => void }) {
+export function ResinParamsPanel({ params, onChange, recommendation }: { params: ResinPrintParams; onChange: (p: ResinPrintParams) => void; recommendation?: ExposureRecommendation | null }) {
   const { t } = useI18n()
+  const rec = recommendation ?? null
+  const recApplied = !!rec && Math.abs(params.exposureSec - rec.exposureSec) < 0.05 && params.bottomExposureSec === rec.bottomExposureSec && params.bottomLayers === rec.bottomLayers
+  const applyRec = () => { if (rec) onChange({ ...params, exposureSec: rec.exposureSec, bottomExposureSec: rec.bottomExposureSec, bottomLayers: rec.bottomLayers, liftCycleSec: rec.liftCycleSec ?? params.liftCycleSec }) }
   const MIN: Partial<Record<keyof ResinPrintParams, number>> = { layerHeight: 0.01, exposureSec: 0.1, bottomExposureSec: 0.1, bottomLayers: 0, liftCycleSec: 0, supportRatio: 0, overhangThresholdDeg: 1, hollowWallMm: 0.5, hollowResidualRatio: 0 }
   const set = <K extends keyof ResinPrintParams>(k: K, v: ResinPrintParams[K]) => {
     const min = MIN[k]
@@ -71,6 +75,15 @@ export function ResinParamsPanel({ params, onChange }: { params: ResinPrintParam
   }
   return (
     <div className="space-y-3">
+      {rec && (
+        <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${recApplied ? 'border-emerald-900/60 bg-emerald-950/30 text-emerald-200' : 'border-sky-900/60 bg-sky-950/30 text-sky-100'}`}>
+          <div>
+            <div>{t('exposure.recommended', { exp: rec.exposureSec, bottom: rec.bottomExposureSec, layers: rec.bottomLayers, lh: rec.layerHeight })}{rec.liftCycleSec != null ? t('exposure.lift', { s: rec.liftCycleSec }) : ''}</div>
+            <div className="text-[11px] opacity-80">{rec.base.label} · {t(`exposure.type.${rec.resinType}`)} · {rec.base.source}{rec.confidence === 'derived' ? t('exposure.derived') : ''}</div>
+          </div>
+          {recApplied ? <span className="text-[11px]">✓ {t('exposure.applied')}</span> : <button type="button" className="rounded-md border border-sky-700 bg-sky-900/50 px-2 py-1 text-xs text-sky-100 hover:bg-sky-800/60" onClick={applyRec}>{t('exposure.apply')}</button>}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('params.layerHeight')}><NumberInput value={params.layerHeight} onChange={(v) => set('layerHeight', v)} min={0.01} max={0.2} step={0.01} suffix="mm" /></Field>
         <Field label={t('params.exposure')}><NumberInput value={params.exposureSec} onChange={(v) => set('exposureSec', v)} min={0.5} max={30} step={0.1} suffix="sn" /></Field>

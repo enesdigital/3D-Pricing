@@ -286,6 +286,23 @@ export const en: Dict = {
     inherits: `Partial profile (inherits “{name}”): missing fields were filled from current values.`,
     costNote: `Profile cost {cost} (slicer currency); enter the ₺/kg value manually.`,
   },
+  orient: {
+    button: `⟳ Auto-orient`,
+    busy: `Computing…`,
+    title: `Orientation suggestions (90° steps)`,
+    metrics: `height {h} mm · support {sup} cm³ · overhang {over} cm² · bed {bed} cm²`,
+    apply: `Apply`,
+    current: `current`,
+    hint: `FDM weighs support volume and overhang first, then height and bed contact; resin also weighs footprint (peel force). Intermediate angles such as 45° are not tried.`,
+  },
+  exposure: {
+    recommended: `Recommended exposure ({lh} mm): {exp} s · bottom {bottom} s × {layers} layers`,
+    lift: ` · lift cycle ≈ {s} s`,
+    apply: `Apply`,
+    applied: `applied`,
+    derived: ` · derived starting point, calibrate`,
+    type: { standard: `standard resin`, water: `water-washable`, abslike: `ABS-like / tough`, highres: `high-detail`, clear: `clear`, other: `other resin` },
+  },
   fileDrop: {
     addCompact: `Drop or click to add a part to the project`,
     compact: `Click or drag to upload another file`,

@@ -6,6 +6,7 @@ import { parseStep } from '../lib/mesh/parseStep.ts'
 import { decimateForDisplay } from '../lib/mesh/decimate.ts'
 import { analyzeMesh, transformPositions } from '../lib/mesh/analyze.ts'
 import { computeThickness } from '../lib/mesh/thickness.ts'
+import { rankOrientations } from '../lib/mesh/orient.ts'
 import type { WorkerRequest, WorkerResponse } from '../lib/mesh/types.ts'
 
 /** Parça kimliği → orijinal (sadeleştirilmemiş) konumlar; çok parçalı projede hepsi burada tutulur */
@@ -40,6 +41,13 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
       const DISPLAY_MAX = 1_500_000
       const copy = parsed.triangleCount > DISPLAY_MAX ? await decimateForDisplay(parsed.positions, 1_000_000) : parsed.positions.slice()
       post({ type: 'loaded', id: msg.id, positions: copy, triangleCount: parsed.triangleCount, format: parsed.format, unit, colorHint, objectCount, decimated: parsed.triangleCount > DISPLAY_MAX }, [copy.buffer])
+      return
+    }
+    if (msg.type === 'orient') {
+      const original = models.get(msg.partId)
+      if (!original) throw new Error('Önce bir model yüklenmeli.')
+      const candidates = rankOrientations(original, { overhangThresholdDeg: msg.overhangThresholdDeg, tech: msg.tech, placement: msg.placement, onProgress: (f) => post({ type: 'progress', id: msg.id, phase: 'orient', fraction: f }) })
+      post({ type: 'oriented', id: msg.id, candidates })
       return
     }
     if (msg.type === 'analyze') {

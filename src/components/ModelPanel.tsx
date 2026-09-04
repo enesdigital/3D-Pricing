@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { effectiveScale, type MeshStats, type Placement, type ThicknessData } from '../lib/mesh/types.ts'
 import type { LoadedModel } from '../lib/mesh/useMeshWorker.ts'
 import { Button, NumberInput, Toggle } from './ui.tsx'
+import type { OrientationMetrics } from '../lib/mesh/orient.ts'
 import { useI18n } from '../lib/i18n/index.tsx'
 
 interface Props {
@@ -15,12 +17,22 @@ interface Props {
   onThicknessCheck: (v: boolean) => void
   thickness: ThicknessData | null
   thinness: { fraction: number; thresholdMm: number; p5: number } | null
+  /** Otomatik yönlendirme: adayları hesapla ve seçileni uygula */
+  onAutoOrient?: () => Promise<OrientationMetrics[]>
 }
 
 const fmt = (n: number, d = 1) => n.toLocaleString('tr-TR', { maximumFractionDigits: d })
 
-export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck, onManifoldCheck, onClear, thicknessCheck, onThicknessCheck, thickness, thinness }: Props) {
+export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck, onManifoldCheck, onClear, thicknessCheck, onThicknessCheck, thickness, thinness, onAutoOrient }: Props) {
   const { t } = useI18n()
+  const [orientBusy, setOrientBusy] = useState(false)
+  const [candidates, setCandidates] = useState<OrientationMetrics[] | null>(null)
+  const [orientError, setOrientError] = useState<string | null>(null)
+  const runOrient = async () => {
+    if (!onAutoOrient) return
+    setOrientBusy(true); setOrientError(null)
+    try { setCandidates(await onAutoOrient()) } catch (e) { setOrientError(e instanceof Error ? e.message : String(e)) } finally { setOrientBusy(false) }
+  }
   const rot = (axis: 'rotX' | 'rotY' | 'rotZ', d: number) => onPlacement({ ...placement, [axis]: ((placement[axis] + d) % 360 + 360) % 360 })
   const inch = placement.unit === 25.4
   const scale = effectiveScale(placement)
@@ -73,7 +85,10 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
       )}
 
       <div>
-        <div className="mb-1 text-xs font-medium text-zinc-400">{t('model.placement')}</div>
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs font-medium text-zinc-400">{t('model.placement')}</span>
+          {onAutoOrient && <button type="button" className="text-[11px] text-sky-300 hover:underline disabled:opacity-50" disabled={orientBusy || !stats} onClick={runOrient}>{orientBusy ? t('orient.busy') : t('orient.button')}</button>}
+        </div>
         <div className="grid grid-cols-3 gap-1">
           {(['rotX', 'rotY', 'rotZ'] as const).map((a) => (
             <div key={a} className="flex items-center rounded-md border border-zinc-700 bg-zinc-950">
@@ -84,6 +99,25 @@ export function ModelPanel({ model, stats, placement, onPlacement, manifoldCheck
           ))}
         </div>
       </div>
+
+      {orientError && <p className="text-[11px] text-red-300">{orientError}</p>}
+      {candidates && candidates.length > 0 && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-2 text-xs">
+          <div className="mb-1 flex items-center justify-between"><span className="text-zinc-400">{t('orient.title')}</span><button type="button" className="text-[11px] text-zinc-500 hover:text-zinc-300" onClick={() => setCandidates(null)}>✕</button></div>
+          <ul className="space-y-1">
+            {candidates.slice(0, 4).map((c, i) => {
+              const current = c.rotX === placement.rotX && c.rotY === placement.rotY && placement.rotZ === 0
+              return (
+                <li key={`${c.rotX}-${c.rotY}`} className="flex flex-wrap items-center justify-between gap-1">
+                  <span className={current ? 'text-emerald-300' : 'text-zinc-200'}>{i === 0 ? '★ ' : ''}X {c.rotX}° Y {c.rotY}° <span className="text-zinc-500">· {t('orient.metrics', { h: fmt(c.height, 0), sup: fmt(c.supportColumnVolume / 1000, 1), over: fmt(c.overhangArea / 100, 1), bed: fmt(c.bedContactArea / 100, 1) })}</span></span>
+                  {current ? <span className="text-[11px] text-emerald-300">{t('orient.current')}</span> : <button type="button" className="rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 hover:bg-zinc-800" onClick={() => onPlacement({ ...placement, rotX: c.rotX, rotY: c.rotY, rotZ: 0 })}>{t('orient.apply')}</button>}
+                </li>
+              )
+            })}
+          </ul>
+          <p className="mt-1 text-[11px] leading-snug text-zinc-500">{t('orient.hint')}</p>
+        </div>
+      )}
 
       <div>
         <div className="mb-1 flex items-center justify-between">
